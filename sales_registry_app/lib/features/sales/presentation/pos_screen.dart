@@ -1,0 +1,526 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:go_router/go_router.dart';
+import '../../auth/presentation/controllers/auth_controller.dart';
+import '../data/sales_repository.dart';
+
+// Provider del Catálogo
+final productsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final session = ref.watch(sessionProvider);
+  if (session == null) return [];
+  final response = await Supabase.instance.client
+      .from('products')
+      .select()
+      .eq('store_id', session.storeId)
+      .order('category', ascending: true) // Si no existe localmente, igual lo ordena
+      .order('name');
+  return response;
+});
+
+// Filtros Locales de Muestra
+final searchQueryProvider = StateProvider<String>((ref) => '');
+final selectedCategoryProvider = StateProvider<String?>((ref) => null);
+
+// Proveedor derivado (Filtrado)
+final filteredProductsProvider = Provider<AsyncValue<List<Map<String, dynamic>>>>((ref) {
+  final productsAsync = ref.watch(productsProvider);
+  final query = ref.watch(searchQueryProvider).toLowerCase().trim();
+  final category = ref.watch(selectedCategoryProvider);
+
+  return productsAsync.whenData((list) {
+    return list.where((p) {
+      final matchesSearch = p['name'].toString().toLowerCase().contains(query);
+      final pCategory = p['category']?.toString() ?? 'General';
+      final matchesCat = category == null || category == 'Todas' || pCategory == category;
+      return matchesSearch && matchesCat;
+    }).toList();
+  });
+});
+
+// Estado del carrito local
+final cartProvider = StateProvider<List<Map<String, dynamic>>>((ref) => []);
+final isCheckingOutProvider = StateProvider<bool>((ref) => false);
+
+class POSScreen extends ConsumerWidget {
+  const POSScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionProvider);
+    final productsAsync = ref.watch(productsProvider); // Para listar Categorías Únicas
+    final filteredAsync = ref.watch(filteredProductsProvider); // Para mostrar la Cuadrícula
+    final cart = ref.watch(cartProvider);
+    
+    if (session == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final totalCart = cart.fold<double>(0, (sum, item) => sum + (item['price'] as num).toDouble());
+    final isDesktop = MediaQuery.of(context).size.width >= 800;
+
+    // Calcular las categorías únicas disponibles
+    final rawProducts = productsAsync.value ?? [];
+    final uniqueCategories = rawProducts.map((p) => p['category']?.toString() ?? 'General').toSet().toList();
+    if (uniqueCategories.isNotEmpty && !uniqueCategories.contains('Todas')) {
+       uniqueCategories.insert(0, 'Todas');
+    }
+
+    // 1. Cabecera dinámica de Filtros y Búsqueda
+    Widget buildSearchAndFilters() {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        color: Colors.white,
+        child: Column(
+          children: [
+            // Buscador Predictivo
+            TextField(
+              onChanged: (val) => ref.read(searchQueryProvider.notifier).state = val,
+              decoration: InputDecoration(
+                hintText: 'Buscar producto...',
+                prefixIcon: const Icon(Icons.search, color: Colors.indigo),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0)
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Chips de Categorías
+            if (uniqueCategories.length > 1)
+              SizedBox(
+                height: 36,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: uniqueCategories.length,
+                  separatorBuilder: (_,__) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                     final cat = uniqueCategories[index];
+                     final selected = ref.watch(selectedCategoryProvider) == cat || (cat == 'Todas' && ref.watch(selectedCategoryProvider) == null);
+                     
+                     return ActionChip(
+                       label: Text(cat, style: TextStyle(fontWeight: FontWeight.bold, color: selected ? Colors.white : Colors.indigo)),
+                       backgroundColor: selected ? Colors.indigo : Colors.indigo.shade50,
+                       side: BorderSide.none,
+                       onPressed: () {
+                          ref.read(selectedCategoryProvider.notifier).state = cat == 'Todas' ? null : cat;
+                       },
+                     );
+                  },
+                ),
+              )
+          ],
+        ),
+      );
+    }
+
+    // 2. Grid Filtrado de Productos
+    Widget buildProductGrid() {
+      return filteredAsync.when(
+        data: (products) {
+          if (products.isEmpty) {
+             return const Center(child: Padding(
+               padding: EdgeInsets.all(30.0),
+               child: Text('No se encontraron productos.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16)),
+             ));
+          }
+          return GridView.builder(
+            padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: isDesktop ? 16 : 100),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: isDesktop ? 4 : 2, 
+              childAspectRatio: 0.82, // Cambiado un poco para dar espacio a la categoría visualmente
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+            ),
+            itemCount: products.length,
+            itemBuilder: (context, index) {
+              final p = products[index];
+              return InkWell(
+                onTap: () {
+                  ref.read(cartProvider.notifier).state = [...cart, {...p, 'cart_id': DateTime.now().millisecondsSinceEpoch.toString()}];
+                  if (!isDesktop) {
+                     ScaffoldMessenger.of(context).clearSnackBars();
+                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('+ ${p['name']}', textAlign: TextAlign.center), duration: const Duration(milliseconds: 400), backgroundColor: Colors.indigo, behavior: SnackBarBehavior.floating));
+                  }
+                },
+                child: Card(
+                  color: Colors.white,
+                  elevation: 2,
+                  shadowColor: Colors.black12,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: Colors.indigo.shade50, shape: BoxShape.circle),
+                        child: const Icon(Icons.inventory_2, size: 32, color: Colors.indigo),
+                      ),
+                      const SizedBox(height: 8),
+                      // Badge de Categoría mini
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(6)),
+                        child: Text(p['category'] ?? 'General', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black54)),
+                      ),
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Text(p['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      ),
+                      const SizedBox(height: 6),
+                      Text('\$${p['price']}', style: const TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.w900)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, stack) => Center(child: Text('Error: $err')),
+      );
+    }
+
+    // 3. Panel del Carrito (Ticket)
+    Widget buildCartPanel({bool isModal = false}) {
+      return Container(
+        color: Colors.grey.shade50,
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.indigo.shade50,
+                borderRadius: isModal ? const BorderRadius.vertical(top: Radius.circular(24)) : BorderRadius.zero,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('TICKET ACTUAL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.indigo, letterSpacing: 1.2)),
+                  if (isModal) 
+                    IconButton(icon: const Icon(Icons.close, color: Colors.indigo), onPressed: () => Navigator.pop(context))
+                ],
+              ),
+            ),
+            Expanded(
+              child: cart.isEmpty 
+                ? const Center(child: Text('El ticket está vacío.\nToca un producto para agregarlo.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 16)))
+                : ListView.separated(
+                separatorBuilder: (context, index) => const Divider(height: 1, color: Colors.black12),
+                itemCount: cart.length,
+                itemBuilder: (context, index) {
+                  final item = cart[index];
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    leading: const CircleAvatar(backgroundColor: Colors.indigo, child: Icon(Icons.shopping_bag, size: 18, color: Colors.white)),
+                    title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                         Text('\$${item['price']}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.green)),
+                         const SizedBox(width: 8),
+                         IconButton(
+                            icon: const Icon(Icons.remove_circle, color: Colors.redAccent),
+                            onPressed: () {
+                               final newCart = List<Map<String, dynamic>>.from(cart)..removeAt(index);
+                               ref.read(cartProvider.notifier).state = newCart;
+                            },
+                         )
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.only(left: 24, right: 24, top: 16, bottom: isModal ? 32 : 24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))]
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('TOTAL A COBRAR:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black54)),
+                      Text('\$${totalCart.toStringAsFixed(2)}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.green)),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.point_of_sale, size: 28),
+                    label: const Text('COBRAR VENTA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      backgroundColor: Colors.indigo,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
+                    ),
+                    onPressed: (cart.isEmpty) ? null : () {
+                       // AL TOCAR COBRAR, LEVANTAMOS EL DIÁLOGO CON OPCIONES (EFECTIVO, DEUDA, CLIENTE)
+                       if (isModal && context.mounted) Navigator.pop(context); 
+                       showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (ctx) => CheckoutDialog(cart: cart, total: totalCart)
+                       );
+                    },
+                  )
+                ],
+              ),
+            )
+          ],
+        ),
+      );
+    }
+
+    // 4. Layout principal responsive
+    return Scaffold(
+      backgroundColor: Colors.grey.shade100,
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Punto de Venta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text('Cajero: ${session.employeeName}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+          ],
+        ),
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Cerrar Sesión',
+            onPressed: () {
+              ref.read(sessionProvider.notifier).state = null;
+              context.go('/login');
+            },
+          )
+        ],
+      ),
+      body: isDesktop 
+        ? Row(
+            children: [
+              Expanded(flex: 2, child: Column(children: [ buildSearchAndFilters(), Expanded(child: buildProductGrid()) ])),
+              Expanded(flex: 1, child: buildCartPanel(isModal: false)),
+            ],
+          )
+        : Column(
+            children: [
+              buildSearchAndFilters(),
+              Expanded(child: buildProductGrid())
+            ],
+          ),
+      
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: isDesktop ? null : 
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.indigo.shade900,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              elevation: 10,
+              shadowColor: Colors.indigo.withOpacity(0.5)
+            ),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => Consumer(
+                  builder: (ctx, modalRef, child) {
+                    // Forzamos a que el Builder escuche al cartProvider localmente.
+                    // Al cambiar, re-ejecuta buildCartPanel()
+                    modalRef.watch(cartProvider);
+                    modalRef.watch(isCheckingOutProvider);
+                    return Container(
+                      height: MediaQuery.of(context).size.height * 0.85,
+                      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+                      child: ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(32)), child: buildCartPanel(isModal: true)),
+                    );
+                  }
+                )
+              );
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.shopping_cart, size: 24),
+                    const SizedBox(width: 12),
+                    Text('${cart.length} items', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Text('Ver Ticket -> \$${totalCart.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.greenAccent)),
+              ],
+            ),
+          ),
+        ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------
+// WIDGET MODAL PARA DETALLES DE PAGO Y CLIENTE ESTILO "CHECKOUT" 
+// -----------------------------------------------------------------------
+class CheckoutDialog extends ConsumerStatefulWidget {
+  final List<Map<String, dynamic>> cart;
+  final double total;
+
+  const CheckoutDialog({super.key, required this.cart, required this.total});
+
+  @override
+  ConsumerState<CheckoutDialog> createState() => _CheckoutDialogState();
+}
+
+class _CheckoutDialogState extends ConsumerState<CheckoutDialog> {
+  String _paymentMethod = 'cash'; // 'cash', 'transfer', 'credit'
+  bool _isProcessing = false;
+  final TextEditingController _customerController = TextEditingController();
+
+  Future<void> _submitSale() async {
+    setState(() => _isProcessing = true);
+    final repo = ref.read(salesRepositoryProvider);
+    try {
+      final customer = _customerController.text.trim().isEmpty ? 'Cliente sin registrar' : _customerController.text.trim();
+      final isDebt = _paymentMethod == 'credit';
+
+      for (var item in widget.cart) {
+        await repo.saveTransaction(
+          productId: item['id'],
+          productDescription: item['name'],
+          amount: (item['price'] as num).toDouble(),
+          paymentMethod: _paymentMethod, 
+          isDebt: isDebt,
+          customerName: customer
+        );
+      }
+      ref.read(cartProvider.notifier).state = []; // Limpiamos el carrito principal
+      if (mounted) {
+         Navigator.pop(context); // Cierra el checkout
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('VENTA REGISTRADA CON ÉXITO 💰', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center,), backgroundColor: Colors.green, duration: const Duration(seconds: 4), behavior: SnackBarBehavior.floating),
+         );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('Error al cobrar: $e', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+               const Icon(Icons.receipt_long, size: 48, color: Colors.indigo),
+               const SizedBox(height: 16),
+               const Text('Confirmar Venta', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+               const SizedBox(height: 8),
+               Text('\$${widget.total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Colors.green), textAlign: TextAlign.center),
+               
+               const Divider(height: 48),
+
+               // Cliente Registrado (Opcional)
+               const Text('Nombre o Token de Cliente', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey)),
+               const SizedBox(height: 8),
+               TextField(
+                  controller: _customerController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                     hintText: 'Token (Ej. FAM-V1P) o Nombre',
+                     prefixIcon: const Icon(Icons.person, color: Colors.indigo),
+                     filled: true,
+                     fillColor: Colors.indigo.shade50,
+                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)
+                  ),
+               ),
+               
+               const SizedBox(height: 24),
+               const Text('Método de Pago', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey)),
+               const SizedBox(height: 8),
+               
+               // Botones de Selección de Pago
+               Row(
+                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                 children: [
+                    _PayMethodBtn(icon: Icons.payments, label: 'Efectivo', isSelected: _paymentMethod == 'cash', onTap: () => setState(() => _paymentMethod = 'cash')),
+                    const SizedBox(width: 8),
+                    _PayMethodBtn(icon: Icons.compare_arrows, label: 'Transf.', isSelected: _paymentMethod == 'transfer', onTap: () => setState(() => _paymentMethod = 'transfer')),
+                    const SizedBox(width: 8),
+                    _PayMethodBtn(icon: Icons.money_off, label: 'Fiado', isSelected: _paymentMethod == 'credit', onTap: () => setState(() => _paymentMethod = 'credit')),
+                 ],
+               ),
+               const SizedBox(height: 32),
+
+               // Botones Finales
+               Row(
+                  children: [
+                     Expanded(child: OutlinedButton(onPressed: _isProcessing ? null : () => Navigator.pop(context), style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: const Text('CANCELAR', style: TextStyle(fontWeight: FontWeight.bold)))),
+                     const SizedBox(width: 12),
+                     Expanded(child: ElevatedButton(onPressed: _isProcessing ? null : _submitSale, style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: _isProcessing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('CONFIRMAR', style: TextStyle(fontWeight: FontWeight.bold)))),
+                  ],
+               )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PayMethodBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _PayMethodBtn({required this.icon, required this.label, required this.isSelected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+             color: isSelected ? Colors.indigo : Colors.grey.shade100,
+             borderRadius: BorderRadius.circular(12),
+             border: Border.all(color: isSelected ? Colors.indigo : Colors.grey.shade300)
+          ),
+          child: Column(
+             children: [
+                Icon(icon, color: isSelected ? Colors.white : Colors.grey.shade600),
+                const SizedBox(height: 4),
+                Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.grey.shade600, fontWeight: FontWeight.bold, fontSize: 13))
+             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
