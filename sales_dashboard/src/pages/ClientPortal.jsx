@@ -31,7 +31,7 @@ export default function ClientPortal() {
   };
 
   const fetchSales = async (clientData) => {
-     const { data } = await supabase.from('sales').select('*').in('customer_name', clientData.alias_names).order('timestamp', { ascending: false });
+     const { data } = await supabase.from('sales').select('*').in('customer_name', [...clientData.alias_names, clientData.token]).order('timestamp', { ascending: false });
      if (data) {
         setSales(data);
         setDebt(data.filter(s => s.is_debt && !s.is_voided).reduce((acc, s) => acc + Number(s.amount), 0));

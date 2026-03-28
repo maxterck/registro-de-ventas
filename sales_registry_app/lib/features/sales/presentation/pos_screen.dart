@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../auth/presentation/controllers/auth_controller.dart';
 import '../data/sales_repository.dart';
 import '../../admin/presentation/admin_catalog_view.dart';
+import '../../admin/presentation/jefe_clients_view.dart';
 
 // Provider del Catálogo
 final productsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -359,6 +360,21 @@ class POSScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          if (session.canSettleDebts)
+            IconButton(
+              icon: const Icon(Icons.scale, color: Colors.greenAccent),
+              tooltip: 'Saldar Deudas (Fiados)',
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (ctx) => Scaffold(
+                   appBar: AppBar(
+                     title: const Text('Deudas y Fiados', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                     backgroundColor: const Color(0xFF161b22),
+                     iconTheme: const IconThemeData(color: Colors.white)
+                   ),
+                   body: const JefeClientsView()
+                )));
+              },
+            ),
           if (session.canManageProducts)
             IconButton(
               icon: const Icon(Icons.inventory, color: Colors.amberAccent),

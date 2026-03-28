@@ -369,8 +369,8 @@ class _PulsingScatterPlotState extends State<_PulsingScatterPlot> with SingleTic
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))
-      ..repeat(reverse: true);
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2))
+      ..repeat();
   }
 
   @override
@@ -446,17 +446,19 @@ class _ScatterPainter extends CustomPainter {
        final isDebt = d['is_debt'] == true;
        final baseColor = isDebt ? Colors.orangeAccent : Colors.lightBlueAccent;
 
-       final double r = 5.0 + (pulseValue * 5.0); 
-       final opacity = 1.0 - (pulseValue * 0.4);
+       // Base core point
+       final dotPaint = Paint()..color = baseColor;
+       canvas.drawCircle(Offset(x, y), 5.0, dotPaint);
 
-       final dotPaint = Paint()..color = baseColor.withOpacity(opacity);
-       canvas.drawCircle(Offset(x, y), r, dotPaint);
+       // Pulsing halo stroke
+       final haloRadius = 5.0 + (pulseValue * 15.0); 
+       final haloOpacity = (1.0 - pulseValue).clamp(0.0, 1.0);
 
        final strokePaint = Paint()
-         ..color = Colors.white.withOpacity(pulseValue * 0.4)
+         ..color = baseColor.withOpacity(haloOpacity)
          ..style = PaintingStyle.stroke
-         ..strokeWidth = pulseValue * 4.0;
-       canvas.drawCircle(Offset(x, y), r, strokePaint);
+         ..strokeWidth = 2.0;
+       canvas.drawCircle(Offset(x, y), haloRadius, strokePaint);
     }
   }
 

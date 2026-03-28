@@ -357,11 +357,11 @@ function ScatterPlot({ data }) {
    return (
        <div className="w-full overflow-x-auto custom-scrollbar bg-[#0b0f14] p-4 mx-auto rounded-2xl border border-slate-800">
           <style>{`
-             @keyframes pulsePoint {
-                0% { r: 5px; opacity: 1; stroke-width: 0; }
-                100% { r: 10px; opacity: 0.6; stroke-width: 4px; stroke: rgba(255,255,255,0.4); }
+             @keyframes pulseHalo {
+                0% { r: 5px; opacity: 0.8; stroke-width: 0; }
+                100% { r: 15px; opacity: 0; stroke-width: 2px; }
              }
-             .pulsing-dot { animation: pulsePoint 0.7s infinite alternate ease-in-out; }
+             .pulse-halo { animation: pulseHalo 1.5s infinite ease-out; }
           `}</style>
           <svg width={width} height={height} className="min-w-[800px]">
              {/* Y axis lines */}
@@ -389,9 +389,12 @@ function ScatterPlot({ data }) {
 
              {/* Points */}
              {points.map((p, i) => (
-                <circle key={i} cx={p.cx} cy={p.cy} fill={p.isDebt ? '#f97316' : '#38bdf8'} className="pulsing-dot cursor-pointer cursor-crosshair">
-                   <title>{`Monto: $${p.amount} | Hora: ${p.time}`}</title>
-                </circle>
+                <g key={i}>
+                   <circle cx={p.cx} cy={p.cy} fill="transparent" stroke={p.isDebt ? '#f97316' : '#38bdf8'} className="pulse-halo" style={{animationDelay: `${(i % 5) * 0.2}s`}} />
+                   <circle cx={p.cx} cy={p.cy} r={5} fill={p.isDebt ? '#f97316' : '#38bdf8'} className="hover:r-[8px] transition-all cursor-pointer">
+                      <title>{`Monto: $${p.amount} | Hora: ${p.time} hs`}</title>
+                   </circle>
+                </g>
              ))}
           </svg>
        </div>
