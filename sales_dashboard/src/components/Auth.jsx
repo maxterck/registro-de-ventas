@@ -55,10 +55,16 @@ export default function Auth({ onLogin }) {
             {!loading && <ArrowRight className="w-5 h-5" />}
           </button>
         </form>
-        <div className="mt-6 text-center relative z-10">
+        <div className="mt-6 text-center relative z-10 flex flex-col gap-4">
           <button onClick={() => setIsLogin(!isLogin)} className="text-slate-400 hover:text-white transition-colors text-sm">
             {isLogin ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Ingresa aquí'}
           </button>
+          
+          <div className="border-t border-slate-800/80 pt-4">
+             <button onClick={() => window.location.href = '/client'} className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors text-sm flex items-center justify-center gap-2 w-full">
+                Soy un cliente (Consultar mis fiados) <ArrowRight className="w-4 h-4" />
+             </button>
+          </div>
         </div>
       </div>
     </div>
