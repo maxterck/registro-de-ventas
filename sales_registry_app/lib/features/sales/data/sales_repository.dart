@@ -39,7 +39,7 @@ class SalesRepository {
         'payment_method': paymentMethod,
         'customer_name': customerName,
         'is_debt': isDebt,
-        'created_by_key': session.keyId,
+        if (session.role != 'admin') 'created_by_key': session.keyId,
         // El timestamp lo gestiona la BD automáticamente con el DEFAULT NOW()
       });
     } catch (e) {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Users, UserPlus, Trash2, Receipt, TrendingUp, DollarSign, WalletCards, ShieldAlert, Loader2, CreditCard, ChevronDown, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Users, UserPlus, Trash2, Receipt, TrendingUp, DollarSign, WalletCards, ShieldAlert, Loader2, CreditCard, ChevronDown, CheckCircle2, AlertCircle, X } from 'lucide-react';
 
 export default function ClientsManager({ storeId, onDashboardUpdate }) {
   const [clients, setClients] = useState([]);
@@ -294,25 +294,26 @@ export default function ClientsManager({ storeId, onDashboardUpdate }) {
            <div className="bg-[#161b22] border border-slate-700 w-full max-w-4xl max-h-[85vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col slide-in-from-bottom-8">
               
               {/* Header Modal */}
-              <div className="p-6 border-b border-slate-800 bg-[#0d1117] flex justify-between items-start">
-                 <div>
-                   <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                     <WalletCards className="text-indigo-400 w-7 h-7" /> Entradas de {selectedClient.token}
+              <div className="p-4 md:p-6 border-b border-slate-800 bg-[#0d1117] flex justify-between items-start gap-4">
+                 <div className="flex-1 min-w-0">
+                   <h2 className="text-lg md:text-2xl font-bold text-white flex items-center gap-2 md:gap-3">
+                     <WalletCards className="text-indigo-400 w-6 h-6 shrink-0" /> 
+                     <span className="truncate">Entradas de {selectedClient.token}</span>
                    </h2>
-                   <div className="flex gap-2 mt-2">
-                     {selectedClient.alias_names.map(a => <span key={a} className="text-xs text-slate-400 bg-white/5 px-2 py-1 rounded">{a}</span>)}
+                   <div className="flex flex-wrap gap-2 mt-2">
+                     {selectedClient.alias_names.map(a => <span key={a} className="text-xs text-slate-400 bg-white/5 px-2 py-1 rounded truncate max-w-full">{a}</span>)}
                    </div>
                  </div>
-                 <button onClick={() => { setSelectedClient(null); loadClients(); }} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors">
-                    <ChevronDown className="w-6 h-6"/>
+                 <button onClick={() => { setSelectedClient(null); loadClients(); }} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors shrink-0">
+                    <X className="w-6 h-6"/>
                  </button>
               </div>
               
               {/* Toolbar Actions Modal */}
-              <div className="p-4 bg-indigo-900/10 border-b border-indigo-500/10 flex justify-between items-center">
-                 <p className="text-indigo-200">Deuda Pendiente General: <span className="font-extrabold text-orange-400 text-xl ml-2">${clientSales.filter(s=>s.is_debt).reduce((acc, s)=> acc + Number(s.amount), 0).toFixed(2)}</span></p>
-                 <button onClick={payOffAllDebt} className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5"/> Liquidar TODO a Efectivo
+              <div className="p-4 bg-indigo-900/10 border-b border-indigo-500/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                 <p className="text-indigo-200 text-sm md:text-base">Deuda Pendiente General: <span className="font-extrabold text-orange-400 text-xl ml-2">${clientSales.filter(s=>s.is_debt).reduce((acc, s)=> acc + Number(s.amount), 0).toFixed(2)}</span></p>
+                 <button onClick={payOffAllDebt} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <CheckCircle2 className="w-5 h-5"/> Liquidar TODO
                  </button>
               </div>
 

@@ -34,9 +34,11 @@ export default function ClientPortal() {
      const { data } = await supabase.from('sales').select('*').in('customer_name', clientData.alias_names).order('timestamp', { ascending: false });
      if (data) {
         setSales(data);
-        setDebt(data.filter(s => s.is_debt).reduce((acc, s) => acc + Number(s.amount), 0));
+        setDebt(data.filter(s => s.is_debt && !s.is_voided).reduce((acc, s) => acc + Number(s.amount), 0));
      }
   };
+
+  const totalBought = sales.filter(s => !s.is_voided).reduce((acc, s) => acc + Number(s.amount), 0);
 
   const notifyPayment = async () => {
      setAlerting(true);
@@ -89,9 +91,10 @@ export default function ClientPortal() {
               <h2 className={`text-sm font-bold uppercase tracking-widest mb-4 opacity-80 ${debt > 0 ? 'text-orange-400' : 'text-emerald-400'}`}>
                  Tu Deuda Actual
               </h2>
-              <p className={`text-6xl md:text-7xl font-black mb-8 tracking-tighter ${debt > 0 ? 'text-orange-500' : 'text-emerald-500'}`}>
+              <p className={`text-6xl md:text-7xl font-black md:mb-2 tracking-tighter ${debt > 0 ? 'text-orange-500' : 'text-emerald-500'}`}>
                  ${debt.toFixed(2)}
               </p>
+              <p className="text-slate-400 font-medium mb-8">Has consumido históricamente: <span className="text-white">${totalBought.toFixed(2)}</span></p>
 
               {debt > 0 && (
                  <button 
@@ -120,7 +123,7 @@ export default function ClientPortal() {
                     sales.filter(s => s.is_debt).map(sale => (
                        <div key={sale.id} className="p-4 md:p-6 flex justify-between items-center group hover:bg-white/5 transition-colors">
                           <div className="flex flex-col">
-                             <span className="text-white font-semibold text-lg">{sale.product_description}</span>
+                              <span className="text-white font-semibold text-lg">{sale.product_name_snapshot || 'Producto general'}</span>
                              <span className="text-slate-500 text-sm mt-1">{new Date(sale.timestamp).toLocaleString()} • P. {sale.customer_name}</span>
                           </div>
                           <span className="text-orange-400 font-black text-xl whitespace-nowrap">
@@ -143,7 +146,7 @@ export default function ClientPortal() {
                     sales.filter(s => !s.is_debt).slice(0, 5).map(sale => (
                        <div key={sale.id} className="p-4 flex justify-between items-center">
                           <div className="flex flex-col">
-                             <span className="text-slate-300 font-medium">{sale.product_description} <span className="text-slate-600 text-xs ml-2">(Saldado)</span></span>
+                              <span className="text-slate-300 font-medium">{sale.product_name_snapshot || 'Producto general'} <span className="text-slate-600 text-xs ml-2">(Saldado)</span></span>
                              <span className="text-slate-600 text-xs mt-1">{new Date(sale.timestamp).toLocaleDateString()}</span>
                           </div>
                           <span className="text-emerald-500/70 font-black">

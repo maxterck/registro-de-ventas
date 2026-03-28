@@ -24,7 +24,7 @@ class JefeKeysView extends ConsumerStatefulWidget {
 
 class _JefeKeysViewState extends ConsumerState<JefeKeysView> {
   final _nameController = TextEditingController();
-  String _newRole = 'edit';
+
   bool _isLoading = false;
 
   Future<void> _createKey() async {
@@ -40,7 +40,7 @@ class _JefeKeysViewState extends ConsumerState<JefeKeysView> {
         'store_id': session?.storeId,
         'key_token': token,
         'employee_name': name,
-        'role': _newRole,
+        'role': 'edit',
         'is_active': true,
       });
       _nameController.clear();
@@ -69,6 +69,16 @@ class _JefeKeysViewState extends ConsumerState<JefeKeysView> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permisos de Cajero actualizados'), backgroundColor: Colors.indigo));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: Verifica tu SQL column can_manage_products. $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _toggleBalanza(Map<String, dynamic> keyData) async {
+    try {
+      await Supabase.instance.client.from('access_keys').update({'can_settle_debts': !(keyData['can_settle_debts'] ?? false)}).eq('id', keyData['id']);
+      ref.invalidate(keysProvider);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permisos de Balanza actualizados'), backgroundColor: Colors.indigo));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
@@ -128,25 +138,6 @@ class _JefeKeysViewState extends ConsumerState<JefeKeysView> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 1,
-                      child: DropdownButtonFormField<String>(
-                        dropdownColor: const Color(0xFF161b22),
-                        value: _newRole,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: const Color(0xFF0b0f14),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'edit', child: Text('Cajero')),
-                          DropdownMenuItem(value: 'read_only', child: Text('Lector')),
-                        ],
-                        onChanged: (v) => setState(() => _newRole = v!),
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -204,7 +195,8 @@ class _JefeKeysViewState extends ConsumerState<JefeKeysView> {
                               ),
                               Row(
                                 children: [
-                                  IconButton(icon: Icon(Icons.star, color: (keyData['can_manage_products'] == true) ? Colors.amber : Colors.white30), tooltip: 'VIP', onPressed: () => _toggleVIP(keyData)),
+                                  IconButton(icon: Icon(Icons.scale, color: (keyData['can_settle_debts'] == true) ? Colors.greenAccent : Colors.white30), tooltip: 'Balanza', onPressed: () => _toggleBalanza(keyData)),
+                                  IconButton(icon: Icon(Icons.shield, color: (keyData['can_manage_products'] == true) ? Colors.amber : Colors.white30), tooltip: 'VIP', onPressed: () => _toggleVIP(keyData)),
                                   IconButton(icon: const Icon(Icons.delete, color: Colors.white30), onPressed: () => _deleteKey(keyData['id'])),
                                 ],
                               )

@@ -103,10 +103,13 @@ class _ProductFormViewState extends ConsumerState<ProductFormView> {
             const SizedBox(height: 32),
             TextFormField(
               controller: _nameController,
+              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: 'Nombre del Producto',
-                prefixIcon: const Icon(Icons.inventory_2),
+                labelStyle: const TextStyle(color: Colors.white70),
+                prefixIcon: const Icon(Icons.inventory_2, color: Colors.indigoAccent),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.white24)),
               ),
               validator: (v) => v!.isEmpty ? 'El nombre es obligatorio' : null,
             ),
@@ -114,10 +117,13 @@ class _ProductFormViewState extends ConsumerState<ProductFormView> {
             TextFormField(
               controller: _priceController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: 'Precio de Venta (\$)',
-                prefixIcon: const Icon(Icons.attach_money),
+                labelStyle: const TextStyle(color: Colors.white70),
+                prefixIcon: const Icon(Icons.attach_money, color: Colors.indigoAccent),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.white24)),
               ),
               validator: (v) {
                  if (v!.isEmpty) return 'El precio es obligatorio';
@@ -128,10 +134,14 @@ class _ProductFormViewState extends ConsumerState<ProductFormView> {
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: _category,
+              dropdownColor: const Color(0xFF1c2128),
+              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: 'Categoría',
-                prefixIcon: const Icon(Icons.category),
+                labelStyle: const TextStyle(color: Colors.white70),
+                prefixIcon: const Icon(Icons.category, color: Colors.indigoAccent),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.white24)),
               ),
               items: const [
                 DropdownMenuItem(value: 'General', child: Text('General')),
@@ -140,6 +150,7 @@ class _ProductFormViewState extends ConsumerState<ProductFormView> {
                 DropdownMenuItem(value: 'Golosinas', child: Text('Golosinas')),
                 DropdownMenuItem(value: 'Lácteos', child: Text('Lácteos')),
                 DropdownMenuItem(value: 'Limpieza', child: Text('Limpieza')),
+                DropdownMenuItem(value: 'Peso/Cantidad', child: Text('Peso/Cantidad ⚖️')),
                 DropdownMenuItem(value: 'Otros', child: Text('Otros')),
               ],
               onChanged: (val) => setState(() => _category = val!),

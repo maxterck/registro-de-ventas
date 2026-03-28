@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Key, UserPlus, ShieldAlert, MonitorCheck, Loader2, Trash2, Receipt, TrendingUp, Power, PowerOff, X, FileText } from 'lucide-react';
+import { Key, UserPlus, ShieldAlert, MonitorCheck, Loader2, Trash2, Receipt, TrendingUp, Power, PowerOff, X, FileText, Scale } from 'lucide-react';
 
 export default function KeysManager({ storeId }) {
   const [keys, setKeys] = useState([]);
@@ -70,10 +70,21 @@ export default function KeysManager({ storeId }) {
     const { data, error } = await supabase.from('access_keys').update({ can_manage_products: newVal }).eq('id', keyData.id).select('*, sales(amount)').single();
     if (data) {
       setKeys(keys.map(k => k.id === keyData.id ? data : k));
-      if (newVal) alert('🌟 Función VIP Activada: Este empleado ahora puede añadir/modificar productos y saldar deudas.');
+      if (newVal) alert('🌟 Función VIP Activada: Este empleado ahora puede añadir/modificar productos.');
       else alert('Permisos VIP desactivados.');
     } else {
       alert('Error: Asegúrate de haber ejecutado el SQL para añadir la columna can_manage_products');
+    }
+  };
+
+  const toggleDebtPerm = async (keyData) => {
+    const newVal = !keyData.can_settle_debts;
+    const { data, error } = await supabase.from('access_keys').update({ can_settle_debts: newVal }).eq('id', keyData.id).select('*, sales(amount)').single();
+    if (data) {
+      setKeys(keys.map(k => k.id === keyData.id ? data : k));
+      if (newVal) alert('⚖️ Permiso Otorgado: Este cajero ahora puede saldar deudas de Fiados.');
+    } else {
+      alert('Error: Asegúrate de haber ejecutado el SQL para añadir la columna can_settle_debts (ALTER TABLE access_keys ADD COLUMN can_settle_debts BOOLEAN DEFAULT false;)');
     }
   };
 
@@ -172,8 +183,11 @@ export default function KeysManager({ storeId }) {
                       </div>
                    </div>
                    <div className="flex flex-col gap-2">
-                      <button onClick={() => toggleVIP(key)} className={`transition-colors p-2 rounded-xl border ${key.can_manage_products ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 shadow-lg shadow-amber-500/20' : 'text-slate-500 border-transparent hover:bg-slate-800'}`} title="Otorgar Permisos VIP (Gestión)">
+                      <button onClick={() => toggleVIP(key)} className={`transition-colors p-2 rounded-xl border ${key.can_manage_products ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 shadow-lg shadow-amber-500/20' : 'text-slate-500 border-transparent hover:bg-slate-800'}`} title="Otorgar Permisos VIP (Gestión Productos)">
                          <MonitorCheck className="w-5 h-5" />
+                      </button>
+                      <button onClick={() => toggleDebtPerm(key)} className={`transition-colors p-2 rounded-xl border ${key.can_settle_debts ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30 shadow-lg shadow-indigo-500/20' : 'text-slate-500 border-transparent hover:bg-slate-800'}`} title="Permitir Saldar Deudas">
+                         <Scale className="w-5 h-5" />
                       </button>
                       <button onClick={() => deleteKey(key.id)} className="text-slate-600 hover:text-rose-400 transition-colors p-2 hover:bg-rose-500/10 rounded-xl" title="Eliminar empleado">
                          <Trash2 className="w-5 h-5" />

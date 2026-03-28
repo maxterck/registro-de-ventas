@@ -16,7 +16,7 @@ Future<bool> loginWithAccessKey(WidgetRef ref, String accessKey) async {
     // Buscamos la llave usando maybeSingle()
     final data = await supabase
         .from('access_keys')
-        .select('id, store_id, role, employee_name, is_active, can_manage_products')
+        .select('id, store_id, role, employee_name, is_active, can_manage_products, can_settle_debts')
         .eq('key_token', accessKey)
         .maybeSingle();
 
@@ -35,6 +35,7 @@ Future<bool> loginWithAccessKey(WidgetRef ref, String accessKey) async {
       role: data['role'],
       employeeName: data['employee_name'],
       canManageProducts: data['can_manage_products'] ?? false,
+      canSettleDebts: data['can_settle_debts'] ?? false,
     );
     return true;
   } catch (e) {
@@ -81,6 +82,7 @@ Future<bool> loginAsAdmin(WidgetRef ref, String email, String password) async {
       role: 'admin',
       employeeName: 'Administrador',
       canManageProducts: true,
+      canSettleDebts: true,
     );
     return true;
   } catch (e) {

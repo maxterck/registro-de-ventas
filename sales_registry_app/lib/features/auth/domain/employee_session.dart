@@ -4,6 +4,7 @@ class EmployeeSession {
   final String role;
   final String employeeName;
   final bool canManageProducts;
+  final bool canSettleDebts;
 
   EmployeeSession({
     required this.keyId,
@@ -11,5 +12,6 @@ class EmployeeSession {
     required this.role,
     required this.employeeName,
     this.canManageProducts = false,
+    this.canSettleDebts = false,
   });
 }

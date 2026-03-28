@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/presentation/controllers/auth_controller.dart';
 import '../data/sales_repository.dart';
+import '../../admin/presentation/admin_catalog_view.dart';
 
 // Provider del Catálogo
 final productsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -136,11 +137,69 @@ class POSScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final p = products[index];
               return InkWell(
-                onTap: () {
-                  ref.read(cartProvider.notifier).state = [...cart, {...p, 'cart_id': DateTime.now().millisecondsSinceEpoch.toString()}];
-                  if (!isDesktop) {
-                     ScaffoldMessenger.of(context).clearSnackBars();
-                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('+ ${p['name']}', textAlign: TextAlign.center), duration: const Duration(milliseconds: 400), backgroundColor: Colors.indigo, behavior: SnackBarBehavior.floating));
+                onTap: () async {
+                  if (p['category'] == 'Peso/Cantidad') {
+                     final ctrl = TextEditingController();
+                     final res = await showDialog<double>(
+                       context: context,
+                       builder: (ctx) => AlertDialog(
+                         backgroundColor: const Color(0xFF161b22),
+                         title: Text('¿Cantidad de ${p['name']}?', style: const TextStyle(color: Colors.white)),
+                         content: Column(
+                           mainAxisSize: MainAxisSize.min,
+                           children: [
+                              TextField(
+                                controller: ctrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                                autofocus: true,
+                                decoration: InputDecoration(
+                                   filled: true,
+                                   fillColor: Colors.black26,
+                                   hintText: 'Ej: 1.5 o 0.250',
+                                   hintStyle: const TextStyle(color: Colors.white38),
+                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)
+                                )
+                              ),
+                              const SizedBox(height: 12),
+                              const Text('Tip: Para 250 gramos ingresa 0.250', style: TextStyle(color: Colors.orangeAccent, fontSize: 13, fontStyle: FontStyle.italic)),
+                           ]
+                         ),
+                         actions: [
+                           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
+                           TextButton(
+                             onPressed: () {
+                               final val = double.tryParse(ctrl.text.trim().replaceAll(',', '.'));
+                               Navigator.pop(ctx, val);
+                             },
+                             child: const Text('AÑADIR', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold))
+                           )
+                         ]
+                       )
+                     );
+                     
+                     if (res != null && res > 0) {
+                         final currentCart = ref.read(cartProvider);
+                         final finalPrice = (p['price'] as num).toDouble() * res;
+                         final updatedProduct = {
+                             ...p,
+                             'cart_id': DateTime.now().millisecondsSinceEpoch.toString(),
+                             'name': '${p['name']} (${res.toStringAsFixed(3)} Kg/Und)',
+                             'price': double.parse(finalPrice.toStringAsFixed(2)),
+                         };
+                         ref.read(cartProvider.notifier).state = [...currentCart, updatedProduct];
+                         if (!isDesktop && context.mounted) {
+                            ScaffoldMessenger.of(context).clearSnackBars();
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('+ ${updatedProduct['name']}', textAlign: TextAlign.center), duration: const Duration(milliseconds: 600), backgroundColor: Colors.indigo, behavior: SnackBarBehavior.floating));
+                         }
+                     }
+                  } else {
+                     final currentCart = ref.read(cartProvider);
+                     ref.read(cartProvider.notifier).state = [...currentCart, {...p, 'cart_id': DateTime.now().millisecondsSinceEpoch.toString()}];
+                     if (!isDesktop && context.mounted) {
+                        ScaffoldMessenger.of(context).clearSnackBars();
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('+ ${p['name']}', textAlign: TextAlign.center), duration: const Duration(milliseconds: 400), backgroundColor: Colors.indigo, behavior: SnackBarBehavior.floating));
+                     }
                   }
                 },
                 child: Card(
@@ -160,8 +219,14 @@ class POSScreen extends ConsumerWidget {
                       // Badge de Categoría mini
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(6)),
-                        child: Text(p['category'] ?? 'General', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black54)),
+                        decoration: BoxDecoration(
+                            color: p['category'] == 'Peso/Cantidad' ? Colors.orange.shade100 : Colors.grey.shade200, 
+                            borderRadius: BorderRadius.circular(6)
+                        ),
+                        child: Text(
+                            p['category'] == 'Peso/Cantidad' ? 'Peso/Cantidad ⚖️' : (p['category'] ?? 'General'), 
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: p['category'] == 'Peso/Cantidad' ? Colors.orange.shade900 : Colors.black54)
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Padding(
@@ -294,6 +359,21 @@ class POSScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          if (session.canManageProducts)
+            IconButton(
+              icon: const Icon(Icons.inventory, color: Colors.amberAccent),
+              tooltip: 'Modo VIP: Catálogo',
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (ctx) => Scaffold(
+                   appBar: AppBar(
+                     title: const Text('Modo VIP: Añadir/Editar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                     backgroundColor: const Color(0xFF161b22),
+                     iconTheme: const IconThemeData(color: Colors.white)
+                   ),
+                   body: const AdminCatalogView()
+                )));
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar Sesión',
@@ -390,11 +470,20 @@ class _CheckoutDialogState extends ConsumerState<CheckoutDialog> {
   final TextEditingController _customerController = TextEditingController();
 
   Future<void> _submitSale() async {
+    final customer = _customerController.text.trim();
+    final isDebt = _paymentMethod == 'credit';
+
+    if (isDebt && customer.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(content: Text('⚠️ EL TOKEN DEL CLIENTE ES OBLIGATORIO PARA FIADOS', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.redAccent, duration: Duration(seconds: 4)),
+        );
+        return;
+    }
+
     setState(() => _isProcessing = true);
     final repo = ref.read(salesRepositoryProvider);
     try {
-      final customer = _customerController.text.trim().isEmpty ? 'Cliente sin registrar' : _customerController.text.trim();
-      final isDebt = _paymentMethod == 'credit';
+      final customerName = customer.isEmpty ? 'Cliente sin registrar' : customer;
 
       for (var item in widget.cart) {
         await repo.saveTransaction(
@@ -403,7 +492,7 @@ class _CheckoutDialogState extends ConsumerState<CheckoutDialog> {
           amount: (item['price'] as num).toDouble(),
           paymentMethod: _paymentMethod, 
           isDebt: isDebt,
-          customerName: customer
+          customerName: customerName
         );
       }
       ref.read(cartProvider.notifier).state = []; // Limpiamos el carrito principal
@@ -444,17 +533,17 @@ class _CheckoutDialogState extends ConsumerState<CheckoutDialog> {
                
                const Divider(height: 48),
 
-               // Cliente Registrado (Opcional)
-               const Text('Nombre o Token de Cliente', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey)),
+               // Cliente Registrado (Obligatorio en Fiado)
+               Text(_paymentMethod == 'credit' ? 'Token de Cliente (OBLIGATORIO)' : 'Token de Cliente (Opcional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _paymentMethod == 'credit' ? Colors.redAccent : Colors.grey)),
                const SizedBox(height: 8),
                TextField(
                   controller: _customerController,
-                  textCapitalization: TextCapitalization.words,
+                  textCapitalization: TextCapitalization.characters,
                   decoration: InputDecoration(
-                     hintText: 'Token (Ej. FAM-V1P) o Nombre',
-                     prefixIcon: const Icon(Icons.person, color: Colors.indigo),
+                     hintText: 'Ej. FAM-V1P',
+                     prefixIcon: Icon(Icons.person, color: _paymentMethod == 'credit' ? Colors.redAccent : Colors.indigo),
                      filled: true,
-                     fillColor: Colors.indigo.shade50,
+                     fillColor: _paymentMethod == 'credit' ? Colors.red.shade50 : Colors.indigo.shade50,
                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)
                   ),
                ),
