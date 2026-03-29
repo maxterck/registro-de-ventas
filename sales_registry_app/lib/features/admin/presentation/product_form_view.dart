@@ -18,6 +18,7 @@ class _ProductFormViewState extends ConsumerState<ProductFormView> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
+  final _customCategoryController = TextEditingController();
   String _category = 'General';
   bool _isLoading = false;
 
@@ -27,7 +28,15 @@ class _ProductFormViewState extends ConsumerState<ProductFormView> {
     if (widget.productToEdit != null) {
       _nameController.text = widget.productToEdit!['name'];
       _priceController.text = widget.productToEdit!['price'].toString();
-      _category = widget.productToEdit!['category'] ?? 'General';
+      
+      final currentCat = widget.productToEdit!['category'] ?? 'General';
+      const commonCats = ['General', 'Bebidas', 'Snacks', 'Golosinas', 'Lácteos', 'Limpieza', 'Peso/Cantidad', 'Otros'];
+      if (!commonCats.contains(currentCat)) {
+         _category = 'Otros';
+         _customCategoryController.text = currentCat;
+      } else {
+         _category = currentCat;
+      }
     }
   }
 
@@ -35,11 +44,16 @@ class _ProductFormViewState extends ConsumerState<ProductFormView> {
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
+    _customCategoryController.dispose();
     super.dispose();
   }
 
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    final finalCategory = _category == 'Otros' 
+      ? (_customCategoryController.text.trim().isEmpty ? 'Otros' : _customCategoryController.text.trim())
+      : _category;
 
     setState(() => _isLoading = true);
     final session = ref.read(sessionProvider);
@@ -49,7 +63,7 @@ class _ProductFormViewState extends ConsumerState<ProductFormView> {
       final productData = {
         'name': _nameController.text.trim(),
         'price': double.tryParse(_priceController.text.trim()) ?? 0.0,
-        'category': _category,
+        'category': finalCategory,
         'store_id': session?.storeId,
       };
 
@@ -155,6 +169,22 @@ class _ProductFormViewState extends ConsumerState<ProductFormView> {
               ],
               onChanged: (val) => setState(() => _category = val!),
             ),
+            if (_category == 'Otros') ...[
+               const SizedBox(height: 16),
+               TextFormField(
+                  controller: _customCategoryController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Escribe la clase de producto',
+                    labelStyle: const TextStyle(color: Colors.orangeAccent),
+                    prefixIcon: const Icon(Icons.edit, color: Colors.orangeAccent),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.orangeAccent)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.orange, width: 2)),
+                  ),
+                  validator: (v) => v!.isEmpty ? 'Requerido si eliges Otros' : null,
+               )
+            ],
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: _isLoading ? null : _submitForm,

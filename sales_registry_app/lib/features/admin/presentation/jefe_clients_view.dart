@@ -40,103 +40,124 @@ class JefeClientsView extends ConsumerWidget {
   }
 
   void _showClientDetails(BuildContext context, WidgetRef ref, String client, List<Map<String, dynamic>> sales, bool canSettle) {
-     final totalOwed = sales.fold<double>(0, (sum, s) => sum + (num.tryParse(s['amount']?.toString() ?? '0')?.toDouble() ?? 0.0));
-     final saleIds = sales.map((e) => e['id'].toString()).toList();
-
      showModalBottomSheet(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (ctx) => Container(
-           height: MediaQuery.of(context).size.height * 0.7,
-           decoration: const BoxDecoration(
-              color: Color(0xFF0d1117),
-              borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32))
-           ),
-           child: Column(
-              children: [
-                 Container(
-                    width: 50, height: 6,
-                    margin: const EdgeInsets.only(top: 16, bottom: 16),
-                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10))
-                 ),
-                 Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
-                       crossAxisAlignment: CrossAxisAlignment.center,
+        builder: (ctx) {
+           Set<String> selectedIds = sales.map((s) => s['id'].toString()).toSet();
+           return StatefulBuilder(
+              builder: (context, setState) {
+                 final currentTotal = sales.where((s) => selectedIds.contains(s['id'].toString()))
+                                           .fold<double>(0, (sum, s) => sum + (num.tryParse(s['amount']?.toString() ?? '0')?.toDouble() ?? 0.0));
+                 
+                 return Container(
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    decoration: const BoxDecoration(
+                       color: Color(0xFF0d1117),
+                       borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32))
+                    ),
+                    child: Column(
                        children: [
-                          const CircleAvatar(radius: 20, backgroundColor: Colors.orangeAccent, child: Icon(Icons.person, color: Colors.white)),
-                          const SizedBox(width: 16),
-                          Expanded(
-                             child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                          Container(
+                             width: 50, height: 6,
+                             margin: const EdgeInsets.only(top: 16, bottom: 16),
+                             decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10))
+                          ),
+                          Padding(
+                             padding: const EdgeInsets.symmetric(horizontal: 24),
+                             child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                   Text(client, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                                   Text('${sales.length} consumos pendientes', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                                   const CircleAvatar(radius: 20, backgroundColor: Colors.orangeAccent, child: Icon(Icons.person, color: Colors.white)),
+                                   const SizedBox(width: 16),
+                                   Expanded(
+                                      child: Column(
+                                         crossAxisAlignment: CrossAxisAlignment.start,
+                                         children: [
+                                            Text(client, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                                            Text('${selectedIds.length} consumos seleccionados', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                                         ],
+                                      )
+                                   ),
+                                   Text('\$${currentTotal.toStringAsFixed(2)}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 24, fontWeight: FontWeight.w900)),
                                 ],
                              )
                           ),
-                          Text('\$${totalOwed.toStringAsFixed(2)}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 24, fontWeight: FontWeight.w900)),
+                          const Divider(color: Colors.white12, height: 32),
+                          Expanded(
+                             child: ListView.builder(
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                itemCount: sales.length,
+                                itemBuilder: (ctx, i) {
+                                   final s = sales[i];
+                                   final id = s['id'].toString();
+                                   final date = DateTime.tryParse(s['timestamp'].toString());
+                                   final dateStr = date != null ? '${date.day}/${date.month} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}' : '';
+                                   final isSelected = selectedIds.contains(id);
+                                   
+                                   return GestureDetector(
+                                      onTap: () {
+                                         setState(() {
+                                            if (isSelected) selectedIds.remove(id); else selectedIds.add(id);
+                                         });
+                                      },
+                                      child: Container(
+                                         margin: const EdgeInsets.only(bottom: 12),
+                                         padding: const EdgeInsets.all(16),
+                                         decoration: BoxDecoration(color: isSelected ? const Color(0xFF162030) : const Color(0xFF161b22), borderRadius: BorderRadius.circular(16), border: Border.all(color: isSelected ? Colors.orangeAccent.withOpacity(0.5) : Colors.transparent)),
+                                         child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                               Expanded(
+                                                  child: Column(
+                                                     crossAxisAlignment: CrossAxisAlignment.start,
+                                                     children: [
+                                                        Text(s['product_name_snapshot'], style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                                                        const SizedBox(height: 4),
+                                                        Text(dateStr, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                                                     ],
+                                                  )
+                                               ),
+                                               Text('\$${s['amount']}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 18, fontWeight: FontWeight.bold)),
+                                               const SizedBox(width: 12),
+                                               Icon(isSelected ? Icons.check_circle : Icons.circle_outlined, color: isSelected ? Colors.orangeAccent : Colors.white24)
+                                            ]
+                                         )
+                                      )
+                                   );
+                                }
+                             )
+                          ),
+                          if (canSettle)
+                             Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: SizedBox(
+                                   width: double.infinity,
+                                   child: ElevatedButton.icon(
+                                      icon: const Icon(Icons.scale, color: Colors.white),
+                                      label: Text('SALDAR SELECCIONADOS (${selectedIds.length})', style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: 16, color: Colors.white)),
+                                      style: ElevatedButton.styleFrom(
+                                         backgroundColor: selectedIds.isEmpty ? Colors.grey : Colors.green.shade600,
+                                         padding: const EdgeInsets.symmetric(vertical: 16),
+                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                         elevation: 0,
+                                      ),
+                                      onPressed: selectedIds.isEmpty ? null : () => _settleClientDebt(context, ref, client, selectedIds.toList()),
+                                   ),
+                                ),
+                             )
+                          else
+                             const Padding(
+                                padding: EdgeInsets.all(24),
+                                child: Text('Solo los perfiles con Permisos de Deuda (Balanza) pueden compensar cuentas.', style: TextStyle(color: Colors.white38, fontSize: 12), textAlign: TextAlign.center),
+                             )
                        ],
                     )
-                 ),
-                 const Divider(color: Colors.white12, height: 32),
-                 Expanded(
-                    child: ListView.builder(
-                       padding: const EdgeInsets.symmetric(horizontal: 24),
-                       itemCount: sales.length,
-                       itemBuilder: (ctx, i) {
-                          final s = sales[i];
-                          final date = DateTime.tryParse(s['timestamp'].toString());
-                          final dateStr = date != null ? '${date.day}/${date.month} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}' : '';
-                          return Container(
-                             margin: const EdgeInsets.only(bottom: 12),
-                             padding: const EdgeInsets.all(16),
-                             decoration: BoxDecoration(color: const Color(0xFF161b22), borderRadius: BorderRadius.circular(16)),
-                             child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                   Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                         Text(s['product_name_snapshot'], style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-                                         const SizedBox(height: 4),
-                                         Text(dateStr, style: const TextStyle(color: Colors.white38, fontSize: 12)),
-                                      ],
-                                   ),
-                                   Text('\$${s['amount']}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 18, fontWeight: FontWeight.bold)),
-                                ]
-                             )
-                          );
-                       }
-                    )
-                 ),
-                 if (canSettle)
-                    Padding(
-                       padding: const EdgeInsets.all(24),
-                       child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                             icon: const Icon(Icons.scale, color: Colors.white),
-                             label: const Text('COMPENSAR Y SALDAR TODO', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: 16, color: Colors.white)),
-                             style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green.shade600,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                elevation: 0,
-                             ),
-                             onPressed: () => _settleClientDebt(context, ref, client, saleIds),
-                          ),
-                       ),
-                    )
-                 else
-                    const Padding(
-                       padding: EdgeInsets.all(24),
-                       child: Text('Solo los perfiles con Permisos de Deuda (Balanza) pueden compensar cuentas.', style: TextStyle(color: Colors.white38, fontSize: 12), textAlign: TextAlign.center),
-                    )
-              ],
-           )
-        )
+                 );
+              }
+           );
+        }
      );
   }
 

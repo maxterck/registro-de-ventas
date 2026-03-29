@@ -15,6 +15,7 @@ final productsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async 
       .from('products')
       .select()
       .eq('store_id', session.storeId)
+      .order('sold_count', ascending: false) // Lo más vendido primero!
       .order('category', ascending: true) // Si no existe localmente, igual lo ordena
       .order('name');
   return response;

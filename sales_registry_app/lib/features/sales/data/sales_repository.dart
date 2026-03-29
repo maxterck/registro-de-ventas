@@ -42,6 +42,16 @@ class SalesRepository {
         if (session.role != 'admin') 'created_by_key': session.keyId,
         // El timestamp lo gestiona la BD automáticamente con el DEFAULT NOW()
       });
+
+      if (productId != null) {
+        try {
+          final productData = await supabase.from('products').select('sold_count').eq('id', productId).maybeSingle();
+          if (productData != null) {
+            final int currentCount = productData['sold_count'] ?? 0;
+            await supabase.from('products').update({'sold_count': currentCount + 1}).eq('id', productId);
+          }
+        } catch (_) {}
+      }
     } catch (e) {
       throw Exception('Ocurrió un error al guardar la venta: $e');
     }

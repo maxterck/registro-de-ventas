@@ -134,53 +134,7 @@ class _JefeSalesViewState extends ConsumerState<JefeSalesView> {
            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
         }
      }
-  }
-
-  Future<void> _showHistorial(List<Map<String, dynamic>> filteredList) async {
-    final today = DateTime.now();
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-           backgroundColor: const Color(0xFF161b22),
-           title: Text('Historial de Ventas (${today.day}/${today.month}/${today.year})', style: const TextStyle(color: Colors.white, fontSize: 18)),
-           content: Column(
-             mainAxisSize: MainAxisSize.min,
-             children: [
-                SizedBox(
-                   width: double.maxFinite,
-                   height: 300,
-                   child: SingleChildScrollView(
-                     scrollDirection: Axis.horizontal,
-                     child: SizedBox(
-                        width: 800,
-                        height: 300,
-                        child: _PulsingScatterPlot(data: filteredList),
-                     )
-                   ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                   mainAxisAlignment: MainAxisAlignment.center,
-                   children: [
-                      Container(width: 12, height: 12, decoration: const BoxDecoration(color: Colors.lightBlueAccent, shape: BoxShape.circle)),
-                      const SizedBox(width: 8),
-                      const Text('VENTA (Cobrada)', style: TextStyle(color: Colors.lightBlueAccent, fontSize: 12, fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 16),
-                      Container(width: 12, height: 12, decoration: const BoxDecoration(color: Colors.orangeAccent, shape: BoxShape.circle)),
-                      const SizedBox(width: 8),
-                      const Text('FIADO (Deuda)', style: TextStyle(color: Colors.orangeAccent, fontSize: 12, fontWeight: FontWeight.bold)),
-                   ],
-                )
-             ],
-           ),
-           actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar', style: TextStyle(color: Colors.white54)))
-           ]
-        );
-      }
-    );
-  }
+   }
 
   @override
   Widget build(BuildContext context) {
@@ -250,13 +204,6 @@ class _JefeSalesViewState extends ConsumerState<JefeSalesView> {
                                    onChanged: (v) => setState(() => _selectedEmployee = v!),
                                  )
                                ),
-                               const SizedBox(width: 8),
-                               ElevatedButton.icon(
-                                 onPressed: () => _showHistorial(scatterData),
-                                 icon: const Icon(Icons.bar_chart, color: Colors.white, size: 16),
-                                 label: const Text('Historial', style: TextStyle(color: Colors.white)),
-                                 style: ElevatedButton.styleFrom(backgroundColor: Colors.indigoAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)))
-                               )
                             ]
                           )
                         ]
@@ -353,115 +300,4 @@ class _FilterBtn extends StatelessWidget {
       )
     );
   }
-}
-
-class _PulsingScatterPlot extends StatefulWidget {
-  final List<Map<String, dynamic>> data;
-  const _PulsingScatterPlot({Key? key, required this.data}) : super(key: key);
-
-  @override
-  State<_PulsingScatterPlot> createState() => _PulsingScatterPlotState();
-}
-
-class _PulsingScatterPlotState extends State<_PulsingScatterPlot> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2))
-      ..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-         return CustomPaint(
-           painter: _ScatterPainter(widget.data, _controller.value),
-         );
-      }
-    );
-  }
-}
-
-class _ScatterPainter extends CustomPainter {
-  final List<Map<String, dynamic>> data;
-  final double pulseValue;
-  _ScatterPainter(this.data, this.pulseValue);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (data.isEmpty) return;
-
-    final paintLine = Paint()..color = Colors.white12..strokeWidth = 1;
-    final textPainter = TextPainter(textDirection: TextDirection.ltr);
-
-    // Draw axes
-    canvas.drawLine(Offset(0, size.height), Offset(size.width, size.height), paintLine);
-    canvas.drawLine(const Offset(0, 0), Offset(0, size.height), paintLine);
-
-    // Draw grid lines
-    for (int i = 0; i <= 24; i += 4) {
-      final x = (i / 24) * size.width;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paintLine);
-      textPainter.text = TextSpan(text: '${i}h', style: const TextStyle(color: Colors.white30, fontSize: 10));
-      textPainter.layout();
-      textPainter.paint(canvas, Offset(x - (textPainter.width/2), size.height + 4));
-    }
-
-    double maxVal = 0;
-    for (var d in data) {
-       if (d['is_voided'] == true) continue;
-       final amt = num.tryParse(d['amount']?.toString() ?? '0')?.toDouble() ?? 0.0;
-       if (amt > maxVal) maxVal = amt;
-    }
-    if (maxVal == 0) maxVal = 100;
-
-    // Draw Y axis labels
-    for (int i = 0; i <= 4; i++) {
-       final y = size.height - ((i / 4) * size.height);
-       final val = (maxVal * (i / 4)).toInt();
-       textPainter.text = TextSpan(text: '\$$val', style: const TextStyle(color: Colors.white30, fontSize: 10));
-       textPainter.layout();
-       textPainter.paint(canvas, Offset(-textPainter.width - 4, y - (textPainter.height/2)));
-    }
-
-    for (var d in data) {
-       if (d['is_voided'] == true) continue;
-       final amt = num.tryParse(d['amount']?.toString() ?? '0')?.toDouble() ?? 0.0;
-       final dt = DateTime.parse(d['timestamp']).toLocal();
-       final timeFloat = dt.hour + (dt.minute / 60.0);
-       
-       final x = (timeFloat / 24) * size.width;
-       final y = size.height - ((amt / maxVal) * size.height);
-
-       final isDebt = d['is_debt'] == true;
-       final baseColor = isDebt ? Colors.orangeAccent : Colors.lightBlueAccent;
-
-       // Base core point
-       final dotPaint = Paint()..color = baseColor;
-       canvas.drawCircle(Offset(x, y), 5.0, dotPaint);
-
-       // Pulsing halo stroke
-       final haloRadius = 5.0 + (pulseValue * 15.0); 
-       final haloOpacity = (1.0 - pulseValue).clamp(0.0, 1.0);
-
-       final strokePaint = Paint()
-         ..color = baseColor.withOpacity(haloOpacity)
-         ..style = PaintingStyle.stroke
-         ..strokeWidth = 2.0;
-       canvas.drawCircle(Offset(x, y), haloRadius, strokePaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ScatterPainter oldDelegate) => true;
 }

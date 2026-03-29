@@ -110,25 +110,40 @@ export default function SalesManager({ storeId }) {
   }).reduce((sum, sale) => sum + Number(sale.amount), 0);
 
   const exportToCSV = () => {
-     if(filteredSales.length === 0) return alert('No hay datos para exportar');
+     // Filtrar por ventas del mes en curso y no anuladas
+     const thisMonthSales = filteredSales.filter(s => {
+         if(s.is_voided) return false;
+         const d = new Date(s.timestamp);
+         return d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear();
+     });
+
+     if(thisMonthSales.length === 0) return alert('No hay ventas confirmadas de este mes para exportar');
      
-     const headers = ['ID Registro', 'Producto', 'Monto', 'Metodo Pago', 'Cliente', 'Cajero', 'Fecha', 'Estado'];
-     const rows = filteredSales.map(s => [
-         s.id,
-         `"${s.product_name_snapshot}"`,
-         s.amount,
-         translateMethod(s.payment_method),
-         `"${s.customer_name || 'Consumidor Final'}"`,
-         `"${s.access_keys?.employee_name || 'Dueño 👑'}"`,
-         `"${new Date(s.timestamp).toLocaleString('es-ES')}"`,
-         s.is_voided ? 'Anulada' : 'Confirmada'
-     ]);
+     // Usamos punto y coma (;) para compatibilidad con Excel en regiones con habla hispana
+     const headers = ['Día', 'Precio', 'Producto', 'Vendido Por', 'Compró', 'Total'];
      
-     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+     const rows = thisMonthSales.map(s => {
+         const date = new Date(s.timestamp);
+         const dateStr = `${date.getDate()}/${date.getMonth()+1} ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+         return [
+            `"${dateStr}"`,
+            s.amount,
+            `"${s.product_name_snapshot}"`,
+            `"${s.access_keys?.employee_name || 'Dueño'}"`,
+            `"${s.customer_name || 'Consumidor Final'}"`,
+            s.amount
+         ];
+     });
+
+     // Sumatoria total del mes
+     const totalMonthAmount = thisMonthSales.reduce((sum, s) => sum + Number(s.amount), 0);
+     rows.push(['','','','','TOTAL DEL MES:', totalMonthAmount]);
+     
+     const csvContent = "data:text/csv;charset=utf-8,%EF%BB%BF" + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
      const encodedUri = encodeURI(csvContent);
      const link = document.createElement('a');
      link.setAttribute('href', encodedUri);
-     link.setAttribute('download', `reporte_ventas_${filter}_${new Date().toISOString().slice(0,10)}.csv`);
+     link.setAttribute('download', `reporte_mensual_${new Date().toISOString().slice(0,10)}.csv`);
      document.body.appendChild(link);
      link.click();
      document.body.removeChild(link);
