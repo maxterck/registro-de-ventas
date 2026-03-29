@@ -8,6 +8,7 @@ import 'product_form_view.dart';
 import 'jefe_keys_view.dart';
 import 'jefe_sales_view.dart';
 import 'jefe_clients_view.dart';
+import 'jefe_analytics_view.dart';
 
 class AdminStudioScreen extends ConsumerStatefulWidget {
   const AdminStudioScreen({super.key});
@@ -22,13 +23,28 @@ class _AdminStudioScreenState extends ConsumerState<AdminStudioScreen> with Sing
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
+    _tabController.addListener(() {
+      if (!mounted) return;
+      setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Color get _activeColor {
+    switch (_tabController.index) {
+      case 0: return Colors.amberAccent;
+      case 1: return Colors.blueAccent;
+      case 2: return Colors.purpleAccent;
+      case 3: return Colors.indigoAccent;
+      case 4: return Colors.orangeAccent;
+      default: return Colors.indigoAccent;
+    }
   }
 
   @override
@@ -43,10 +59,11 @@ class _AdminStudioScreenState extends ConsumerState<AdminStudioScreen> with Sing
       backgroundColor: const Color(0xFF0d1117), // Theme background from web PC
       appBar: AppBar(
         title: const Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.store, color: Colors.indigoAccent),
             SizedBox(width: 8),
-            Text('Susy Market: Modo Jefe', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white)),
+            Flexible(child: Text('Modo Jefe', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white), overflow: TextOverflow.ellipsis)),
           ],
         ),
         backgroundColor: const Color(0xFF161b22), // Dark slate/indigo matching PC
@@ -72,26 +89,28 @@ class _AdminStudioScreenState extends ConsumerState<AdminStudioScreen> with Sing
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.indigoAccent,
+          labelColor: _activeColor,
           unselectedLabelColor: Colors.blueGrey.shade400,
-          indicatorColor: Colors.indigoAccent,
+          indicatorColor: _activeColor,
 
           indicatorWeight: 4,
           isScrollable: true,
           labelStyle: const TextStyle(fontWeight: FontWeight.bold),
           tabs: const [
-            Tab(icon: Icon(Icons.vpn_key), text: 'Accesos'),
+            Tab(icon: Icon(Icons.bar_chart), text: 'Estadísticas'),
             Tab(icon: Icon(Icons.shopping_cart), text: 'Ventas'),
+            Tab(icon: Icon(Icons.vpn_key), text: 'Accesos'),
             Tab(icon: Icon(Icons.inventory_2), text: 'Catálogo'),
-            Tab(icon: Icon(Icons.people), text: 'Fiados'),
+            Tab(icon: Icon(Icons.people), text: 'Cliente y Fiado'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          const JefeKeysView(),
+          const JefeAnalyticsView(),
           const JefeSalesView(),
+          const JefeKeysView(),
           const AdminCatalogView(),
           const JefeClientsView(),
         ],

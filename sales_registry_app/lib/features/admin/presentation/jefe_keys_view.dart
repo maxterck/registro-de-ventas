@@ -82,6 +82,16 @@ class _JefeKeysViewState extends ConsumerState<JefeKeysView> {
     }
   }
 
+  Future<void> _toggleShiftControl(Map<String, dynamic> keyData) async {
+    try {
+      await Supabase.instance.client.from('access_keys').update({'requires_shift_control': !(keyData['requires_shift_control'] ?? false)}).eq('id', keyData['id']);
+      ref.invalidate(keysProvider);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Control Estricto de Caja actualizado'), backgroundColor: Colors.deepPurpleAccent));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al actualizar: $e'), backgroundColor: Colors.red));
+    }
+  }
+
   Future<void> _deleteKey(String id) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -195,6 +205,7 @@ class _JefeKeysViewState extends ConsumerState<JefeKeysView> {
                               ),
                               Row(
                                 children: [
+                                  IconButton(icon: Icon(Icons.lock_clock, color: (keyData['requires_shift_control'] == true) ? Colors.deepPurpleAccent : Colors.white30), tooltip: 'Cierre de Caja Estricto', onPressed: () => _toggleShiftControl(keyData)),
                                   IconButton(icon: Icon(Icons.scale, color: (keyData['can_settle_debts'] == true) ? Colors.greenAccent : Colors.white30), tooltip: 'Balanza', onPressed: () => _toggleBalanza(keyData)),
                                   IconButton(icon: Icon(Icons.shield, color: (keyData['can_manage_products'] == true) ? Colors.amber : Colors.white30), tooltip: 'VIP', onPressed: () => _toggleVIP(keyData)),
                                   IconButton(icon: const Icon(Icons.delete, color: Colors.white30), onPressed: () => _deleteKey(keyData['id'])),

@@ -5,6 +5,7 @@ class EmployeeSession {
   final String employeeName;
   final bool canManageProducts;
   final bool canSettleDebts;
+  final bool requiresShiftControl;
 
   EmployeeSession({
     required this.keyId,
@@ -13,5 +14,6 @@ class EmployeeSession {
     required this.employeeName,
     this.canManageProducts = false,
     this.canSettleDebts = false,
+    this.requiresShiftControl = false,
   });
 }

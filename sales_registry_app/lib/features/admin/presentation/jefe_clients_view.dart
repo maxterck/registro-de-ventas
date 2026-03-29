@@ -1,8 +1,20 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../auth/presentation/controllers/auth_controller.dart';
 import 'jefe_sales_view.dart'; // import salesListProvider para ahorrar request o re-utilizar la lista
+
+final clientsProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
+  final session = ref.watch(sessionProvider);
+  if (session == null) return [];
+  final res = await Supabase.instance.client
+      .from('clients')
+      .select('*')
+      .eq('store_id', session.storeId)
+      .order('created_at', ascending: false);
+  return res;
+});
 
 class JefeClientsView extends ConsumerWidget {
   const JefeClientsView({super.key});
@@ -161,137 +173,377 @@ class JefeClientsView extends ConsumerWidget {
      );
   }
 
+  void _showCreateClientDialog(BuildContext context, WidgetRef ref) {
+     final session = ref.read(sessionProvider);
+     if (session == null) return;
+     
+     final ctrl = TextEditingController();
+     bool isSaving = false;
+
+     showDialog(
+       context: context,
+       builder: (ctx) => StatefulBuilder(
+         builder: (context, setState) {
+            return AlertDialog(
+               backgroundColor: const Color(0xFF161b22),
+               title: const Text('Nuevo Token de Persona', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+               content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                     const Text('Este token permitirá venderle "Fiado" desde la caja registrarla y asociar sus deudas aquí.', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                     const SizedBox(height: 16),
+                     TextField(
+                        controller: ctrl,
+                        style: const TextStyle(color: Colors.white),
+                        textCapitalization: TextCapitalization.words,
+                        decoration: InputDecoration(
+                           hintText: 'Nombre y Apellido (Alias)',
+                           hintStyle: const TextStyle(color: Colors.white38),
+                           filled: true,
+                           fillColor: const Color(0xFF0b0f14),
+                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)
+                        ),
+                     )
+                  ],
+               ),
+               actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
+                  isSaving 
+                     ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orangeAccent)))
+                     : TextButton(
+                        onPressed: () async {
+                           final alias = ctrl.text.trim();
+                           if (alias.isEmpty) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Ingresa un nombre'), backgroundColor: Colors.redAccent));
+                              return;
+                           }
+                           setState(() => isSaving = true);
+                           try {
+                              const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                              final rnd = Random();
+                              final s = String.fromCharCodes(Iterable.generate(4, (_) => chars.codeUnitAt(rnd.nextInt(chars.length))));
+                              final token = 'CLI-$s';
+
+                              await Supabase.instance.client.from('clients').insert({
+                                 'store_id': session.storeId,
+                                 'token': token,
+                                 'alias_names': [alias]
+                              });
+                              ref.invalidate(clientsProvider);
+                              
+                              if (ctx.mounted) {
+                                 Navigator.pop(ctx);
+                                 ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Usuario creado. Su token es: $token', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)), backgroundColor: Colors.green, duration: const Duration(seconds: 5)));
+                              }
+                           } catch (e) {
+                              if (ctx.mounted) {
+                                 ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                                 setState(() => isSaving = false);
+                              }
+                           }
+                        },
+                        child: const Text('CREAR TOKEN', style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold))
+                     )
+               ],
+            );
+         }
+       )
+     );
+  }
+
+  Widget _buildClientCard(BuildContext context, WidgetRef ref, Map<String, dynamic> clientData, List<Map<String, dynamic>> allMySales, bool canSettle) {
+    final token = clientData['token'].toString();
+    final aliasNamesList = (clientData['alias_names'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    
+    final activeDebts = allMySales.where((s) => s['is_debt'] == true).toList();
+    final totalOwed = activeDebts.fold<double>(0, (sum, s) => sum + (num.tryParse(s['amount']?.toString() ?? '0')?.toDouble() ?? 0.0));
+    final totalPaid = allMySales.where((s) => s['is_debt'] == false).fold<double>(0, (sum, s) => sum + (num.tryParse(s['amount']?.toString() ?? '0')?.toDouble() ?? 0.0));
+
+    final isAllPaid = totalOwed <= 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161b22),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isAllPaid ? Colors.greenAccent.withOpacity(0.5) : Colors.redAccent.withOpacity(0.5), width: 1.5)
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: isAllPaid ? const Color(0xFF0f291e) : const Color(0xFF3b1219),
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(14), topRight: Radius.circular(14))
+            ),
+            child: Text(
+              isAllPaid ? 'TODO PAGADO (VERDE)' : 'CON DEUDA (ROJO)',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isAllPaid ? Colors.greenAccent : Colors.redAccent,
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+                letterSpacing: 1.2
+              )
+            )
+          ),
+          
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Token Block
+                const Text('TOKEN CLIENTE', style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0b0f14),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white12)
+                  ),
+                  child: Text(token, style: const TextStyle(color: Colors.white, fontSize: 18, fontFamily: 'monospace', fontWeight: FontWeight.bold, letterSpacing: 2)),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Aliases Block
+                if (aliasNamesList.isNotEmpty) ...[
+                  const Text('FAMILIAS / NOMBRES', style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8, runSpacing: 8,
+                    children: aliasNamesList.map((alias) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1f242c),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.white12)
+                      ),
+                      child: Text(alias, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    )).toList(),
+                  ),
+                  const SizedBox(height: 24),
+                ] else const SizedBox(height: 8),
+                
+                // Debe / Pagado Block
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0b0f14),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white12)
+                        ),
+                        child: Column(
+                          children: [
+                            const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.access_time, color: Colors.orangeAccent, size: 12),
+                                SizedBox(width: 4),
+                                Text('DEBE', style: TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ]
+                            ),
+                            const SizedBox(height: 8),
+                            Text('\$${totalOwed.toStringAsFixed(2)}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 16, fontWeight: FontWeight.w900)),
+                          ],
+                        )
+                      )
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0b0f14),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white12)
+                        ),
+                        child: Column(
+                          children: [
+                            const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.check_circle_outline, color: Colors.greenAccent, size: 12),
+                                SizedBox(width: 4),
+                                Text('PAGADO', style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ]
+                            ),
+                            const SizedBox(height: 8),
+                            Text('\$${totalPaid.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontSize: 16, fontWeight: FontWeight.w900)),
+                          ],
+                        )
+                      )
+                    )
+                  ]
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Botón accionar
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1f2937),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.receipt_long, size: 18),
+                    label: const Text('Gestionar Consumos', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      if (activeDebts.isNotEmpty) {
+                        _showClientDetails(context, ref, '$token - ${aliasNamesList.join(", ")}', activeDebts, canSettle);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay deudas activas para gestionar.'), backgroundColor: Colors.green));
+                      }
+                    },
+                  )
+                )
+              ]
+            )
+          )
+        ]
+      )
+    );
+  }
+
+  Widget _buildOrphanCard(BuildContext context, WidgetRef ref, List<Map<String, dynamic>> orphanSales, bool canSettle) {
+    final totalOwed = orphanSales.fold<double>(0, (sum, s) => sum + (num.tryParse(s['amount']?.toString() ?? '0')?.toDouble() ?? 0.0));
+
+    return GestureDetector(
+      onTap: () => _showClientDetails(context, ref, 'Fiados Antiguos / Sin Token', orphanSales, canSettle),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF161b22),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.redAccent.withOpacity(0.3))
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Colors.redAccent,
+                  child: Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Fiados Sueltos u Otros', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                      Text('Consumos sin Token vinculado', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Text(
+                  '\$${totalOwed.toStringAsFixed(2)}', 
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 20, fontWeight: FontWeight.w900)
+                ),
+              ],
+            ),
+          ],
+        )
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncSales = ref.watch(salesListProvider);
+    final asyncClients = ref.watch(clientsProvider);
     final session = ref.watch(sessionProvider);
     final canSettle = session?.canSettleDebts ?? false;
 
-    return asyncSales.when(
+    return Scaffold(
+      backgroundColor: const Color(0xFF0b0f14),
+      floatingActionButton: canSettle ? FloatingActionButton.extended(
+         backgroundColor: Colors.orangeAccent,
+         icon: const Icon(Icons.person_add, color: Colors.black),
+         label: const Text('CREAR CLIENTE / TOKEN', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+         onPressed: () => _showCreateClientDialog(context, ref),
+      ) : null,
+      body: asyncSales.when(
       data: (allSales) {
-         // Agrupar por customer_name las ventas que tengan is_debt = true y no esten voided
-         final debtsByClient = <String, List<Map<String, dynamic>>>{};
-         for (var s in allSales) {
-            if (s['is_debt'] == true && s['is_voided'] != true) {
-               final name = s['customer_name'] ?? 'Desconocido';
-               debtsByClient.putIfAbsent(name, () => []).add(s);
-            }
-         }
-
-         if (debtsByClient.isEmpty) {
-            return Container(
-               color: const Color(0xFF0b0f14),
-               child: const Center(
-                  child: Text('No hay clientes con deudas activas.', style: TextStyle(color: Colors.white54, fontSize: 16))
-               )
-            );
-         }
-
-         final keys = debtsByClient.keys.toList()..sort();
-         final globalDebt = debtsByClient.values.expand((element) => element).fold<double>(0, (sum, s) => sum + (num.tryParse(s['amount']?.toString() ?? '0')?.toDouble() ?? 0.0));
-
-         return Container(
-            color: const Color(0xFF0b0f14),
-            child: Column(
-               children: [
-                  Container(
-                     padding: const EdgeInsets.all(24),
-                     decoration: const BoxDecoration(
-                        color: Color(0xFF161b22),
-                        border: Border(bottom: BorderSide(color: Colors.white12))
-                     ),
-                     child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                           const Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                 Text('TOTAL FIADOS', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
-                                 Text('Por Cobrar', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                              ],
-                           ),
-                           Text('\$${globalDebt.toStringAsFixed(2)}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-                        ],
-                     ),
-                  ),
-                  Expanded(
-                     child: GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                           crossAxisCount: 2,
-                           crossAxisSpacing: 16,
-                           mainAxisSpacing: 16,
-                           childAspectRatio: 0.85,
-                        ),
-                        itemCount: keys.length,
-                        itemBuilder: (ctx, i) {
-                           final client = keys[i];
-                           final sales = debtsByClient[client]!;
-                           final totalOwed = sales.fold<double>(0, (sum, s) => sum + (num.tryParse(s['amount']?.toString() ?? '0')?.toDouble() ?? 0.0));
-
-                           return GestureDetector(
-                              onTap: () => _showClientDetails(context, ref, client, sales, canSettle),
-                              child: Container(
-                                 decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                       colors: [Color(0xFF1c2128), Color(0xFF161b22)],
-                                       begin: Alignment.topLeft, end: Alignment.bottomRight
-                                    ),
-                                    borderRadius: BorderRadius.circular(24),
-                                    border: Border.all(color: Colors.orangeAccent.withOpacity(0.15))
-                                 ),
-                                 padding: const EdgeInsets.all(16),
-                                 child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                       const CircleAvatar(
-                                          radius: 26,
-                                          backgroundColor: Colors.orangeAccent,
-                                          child: Icon(Icons.person, color: Colors.white, size: 30),
-                                       ),
-                                       const SizedBox(height: 12),
-                                       Text(
-                                          client, 
-                                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
-                                          textAlign: TextAlign.center,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                       ),
-                                       const SizedBox(height: 8),
-                                       Text(
-                                          '\$${totalOwed.toStringAsFixed(2)}', 
-                                          style: const TextStyle(color: Colors.orangeAccent, fontSize: 20, fontWeight: FontWeight.w900)
-                                       ),
-                                       const Spacer(),
-                                       Container(
-                                          width: double.infinity,
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
-                                          decoration: BoxDecoration(
-                                             color: canSettle ? Colors.green.withOpacity(0.15) : Colors.white10,
-                                             borderRadius: BorderRadius.circular(12)
-                                          ),
-                                          child: Row(
-                                             mainAxisAlignment: MainAxisAlignment.center,
-                                             children: [
-                                                Icon(canSettle ? Icons.scale : Icons.remove_red_eye, color: canSettle ? Colors.greenAccent : Colors.white54, size: 16),
-                                                const SizedBox(width: 6),
-                                                Text(canSettle ? 'Saldar' : 'Ver Detalle', style: TextStyle(color: canSettle ? Colors.greenAccent : Colors.white54, fontWeight: FontWeight.bold, fontSize: 12)),
-                                             ],
-                                          )
-                                       )
-                                    ],
-                                 )
-                              ),
-                           );
-                        }
-                     )
-                  )
-               ]
-            ),
-         );
+        return asyncClients.when(
+          data: (allClients) {
+             final debtSales = allSales.where((s) => s['is_debt'] == true && s['is_voided'] != true).toList();
+             
+             final clientDebts = <Map<String, dynamic>, List<Map<String, dynamic>>>{};
+             final mappedSaleIds = <String>{};
+             
+             for (var c in allClients) {
+                final token = c['token'].toString();
+                final aliases = (c['alias_names'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                
+                final mySales = debtSales.where((s) {
+                   final name = s['customer_name']?.toString() ?? '';
+                   return name == token || aliases.contains(name);
+                }).toList();
+                
+                clientDebts[c] = mySales;
+                mappedSaleIds.addAll(mySales.map((s) => s['id'].toString()));
+             }
+             
+             final orphanSales = debtSales.where((s) => !mappedSaleIds.contains(s['id'].toString())).toList();
+             final globalDebt = debtSales.fold<double>(0, (sum, s) => sum + (num.tryParse(s['amount']?.toString() ?? '0')?.toDouble() ?? 0.0));
+             
+             return Container(
+                color: const Color(0xFF0b0f14),
+                child: Column(
+                   children: [
+                      Container(
+                         padding: const EdgeInsets.all(24),
+                         decoration: const BoxDecoration(color: Color(0xFF161b22), border: Border(bottom: BorderSide(color: Colors.white12))),
+                         child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                               const Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                     Text('TOTAL FIADOS', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
+                                     Text('Por Cobrar', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                                  ],
+                               ),
+                               Text('\$${globalDebt.toStringAsFixed(2)}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                            ],
+                         ),
+                      ),
+                      if (clientDebts.isEmpty && orphanSales.isEmpty)
+                         const Expanded(child: Center(child: Text('No hay clientes registrados ni deudas activas.', style: TextStyle(color: Colors.white54, fontSize: 16))))
+                      else
+                         Expanded(
+                            child: ListView(
+                               padding: const EdgeInsets.all(16),
+                               children: [
+                                  ...clientDebts.entries.map((entry) => _buildClientCard(context, ref, entry.key, entry.value, canSettle)),
+                                  if (orphanSales.isNotEmpty) _buildOrphanCard(context, ref, orphanSales, canSettle),
+                                  const SizedBox(height: 80),
+                               ]
+                            )
+                         )
+                   ],
+                ),
+             );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, st) => Center(child: Text('Error: $e', style: const TextStyle(color: Colors.white))),
+        );
       },
-      loading: () => Container(color: const Color(0xFF0b0f14), child: const Center(child: CircularProgressIndicator())),
-      error: (e, st) => Container(color: const Color(0xFF0b0f14), child: Center(child: Text('Error: $e', style: const TextStyle(color: Colors.white)))),
-    );
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, st) => Center(child: Text('Error: $e', style: const TextStyle(color: Colors.white))),
+    ));
   }
 }

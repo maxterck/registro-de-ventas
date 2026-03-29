@@ -204,39 +204,50 @@ class POSScreen extends ConsumerWidget {
                      }
                   }
                 },
-                child: Card(
-                  color: Colors.white,
-                  elevation: 2,
-                  shadowColor: Colors.black12,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade200),
+                    boxShadow: [
+                      BoxShadow(color: Colors.indigo.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+                    ]
+                  ),
+                  child: Stack(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.indigo.shade50, shape: BoxShape.circle),
-                        child: const Icon(Icons.inventory_2, size: 32, color: Colors.indigo),
-                      ),
-                      const SizedBox(height: 8),
-                      // Badge de Categoría mini
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                            color: p['category'] == 'Peso/Cantidad' ? Colors.orange.shade100 : Colors.grey.shade200, 
-                            borderRadius: BorderRadius.circular(6)
+                      if (p['category'] == 'Peso/Cantidad')
+                        Positioned(
+                          top: 8, right: 8,
+                          child: Icon(Icons.scale, size: 16, color: Colors.orange.shade400),
+                        )
+                      else
+                        Positioned(
+                          top: 8, right: 8,
+                          child: Icon(Icons.inventory_2_outlined, size: 16, color: Colors.grey.shade400),
                         ),
-                        child: Text(
-                            p['category'] == 'Peso/Cantidad' ? 'Peso/Cantidad ⚖️' : (p['category'] ?? 'General'), 
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: p['category'] == 'Peso/Cantidad' ? Colors.orange.shade900 : Colors.black54)
-                        ),
-                      ),
-                      const SizedBox(height: 6),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                        child: Text(p['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      ),
-                      const SizedBox(height: 6),
-                      Text('\$${p['price']}', style: const TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.w900)),
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              p['name'], 
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.black87, height: 1.2), 
+                              textAlign: TextAlign.center, 
+                              maxLines: 2, 
+                              overflow: TextOverflow.ellipsis
+                            ),
+                            const Spacer(),
+                            Text(
+                              '\$${p['price']}', 
+                              style: const TextStyle(fontSize: 22, color: Colors.indigo, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                        ),
+                      )
                     ],
                   ),
                 ),

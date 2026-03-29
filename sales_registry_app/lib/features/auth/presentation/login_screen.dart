@@ -37,6 +37,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _handleAdminTap(BuildContext context, WidgetRef ref) async {
+    _adminTapCount++;
+    if (_adminTapCount >= 5) {
+      _adminTapCount = 0;
+      
+      final prefs = await SharedPreferences.getInstance();
+      final rememberAdmin = prefs.getBool('admin_remember_me') ?? false;
+      
+      if (rememberAdmin) {
+        final email = prefs.getString('admin_saved_email');
+        final pass = prefs.getString('admin_saved_pass');
+        if (email != null && pass != null && email.isNotEmpty && pass.isNotEmpty) {
+          final success = await loginAsAdmin(ref, email, pass);
+          if (success && context.mounted) {
+            context.go('/admin_studio');
+            return;
+          }
+        }
+      }
+      
+      if (context.mounted) {
+         _showAdminLoginDialog(context, ref);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLoading = ref.watch(authLoadingProvider);
@@ -53,13 +79,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SusyMarketLogo(size: 100),
               const SizedBox(height: 16),
               GestureDetector(
-                onTap: () {
-                  _adminTapCount++;
-                  if (_adminTapCount >= 5) {
-                    _adminTapCount = 0;
-                    _showAdminLoginDialog(context, ref);
-                  }
-                },
+                onTap: () => _handleAdminTap(context, ref),
                 child: const Text(
                   'Susy Market',
                   style: TextStyle(

@@ -13,6 +13,19 @@ class AdminCatalogView extends ConsumerStatefulWidget {
 
 class _AdminCatalogViewState extends ConsumerState<AdminCatalogView> {
   String _selectedCategory = 'Todas';
+  String _searchQuery = '';
+
+  Future<void> _updateStock(BuildContext context, WidgetRef ref, String id, int currentStock, int delta) async {
+     final newStock = (currentStock + delta).clamp(0, 999999);
+     try {
+        await Supabase.instance.client.from('products').update({'stock': newStock}).eq('id', id);
+        ref.invalidate(productsProvider);
+     } catch (e) {
+        if (context.mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.redAccent));
+        }
+     }
+  }
 
   Future<void> _deleteProduct(BuildContext context, WidgetRef ref, String id, String name) async {
     final confirm = await showDialog<bool>(
@@ -73,10 +86,9 @@ class _AdminCatalogViewState extends ConsumerState<AdminCatalogView> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0b0f14),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.indigoAccent,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('AÑADIR PRODUCTO', style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.2)),
+        child: const Icon(Icons.add, color: Colors.white),
         onPressed: () => _showProductForm(),
       ),
       body: productsAsync.when(
@@ -85,96 +97,205 @@ class _AdminCatalogViewState extends ConsumerState<AdminCatalogView> {
             return const Center(child: Text('No hay productos en el catálogo.', style: TextStyle(color: Colors.white54)));
           }
 
-          // Obtain unique categories
-          final categories = {'Todas'};
+          // Category list 
+          final catSet = <String>{};
           for (var p in products) {
-            if (p['category'] != null) {
-              categories.add(p['category'] as String);
-            }
+             if (p['category'] != null) catSet.add(p['category'] as String);
           }
-          final categoryList = categories.toList()..sort();
+          final categoryList = ['Todas', 'En Escasez', ...catSet.toList()..sort()];
 
-          // Filter products based on selected category
-          final filteredProducts = _selectedCategory == 'Todas' 
-             ? products 
-             : products.where((p) => p['category'] == _selectedCategory).toList();
+          // Filter
+          final filteredProducts = products.where((p) {
+             final bool matchesSearch = _searchQuery.isEmpty || 
+                 (p['name'] as String).toLowerCase().contains(_searchQuery.toLowerCase());
+                 
+             final int stock = (p['stock'] as num?)?.toInt() ?? 0;
+             final bool matchesCat = _selectedCategory == 'Todas' || 
+                 (_selectedCategory == 'En Escasez' ? stock <= 5 : p['category'] == _selectedCategory);
+                 
+             return matchesSearch && matchesCat;
+          }).toList();
 
           return Column(
             children: [
+              // Search Bar
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: TextField(
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                    hintText: 'Buscar producto...',
+                    hintStyle: const TextStyle(color: Colors.white54),
+                    filled: true,
+                    fillColor: const Color(0xFF161b22),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _searchQuery = val;
+                    });
+                  },
+                ),
+              ),
+              // Category Tabs
               Container(
-                color: const Color(0xFF161b22),
-                height: 60,
+                color: const Color(0xFF0b0f14),
+                height: 50,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: categoryList.length,
                   itemBuilder: (context, index) {
                     final cat = categoryList[index];
                     final isSelected = cat == _selectedCategory;
+                    final isEscasez = cat == 'En Escasez';
+                    
                     return GestureDetector(
                       onTap: () {
-                        setState(() {
-                           _selectedCategory = cat;
-                        });
+                        setState(() { _selectedCategory = cat; });
                       },
                       child: Container(
                         margin: const EdgeInsets.only(right: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
                         decoration: BoxDecoration(
-                          color: isSelected ? Colors.indigoAccent : Colors.transparent,
+                          color: isSelected 
+                            ? (isEscasez ? Colors.amber : Colors.indigoAccent) 
+                            : const Color(0xFF161b22),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: isSelected ? Colors.indigoAccent : Colors.white24),
+                          border: Border.all(color: isSelected ? Colors.transparent : Colors.white12),
                         ),
                         alignment: Alignment.center,
-                        child: Text(
-                          cat,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.white54,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: Row(
+                          children: [
+                            if (isEscasez) ...[
+                               Icon(Icons.warning_amber_rounded, size: 16, color: isSelected ? Colors.black : Colors.amber),
+                               const SizedBox(width: 6),
+                            ],
+                            Text(
+                              cat,
+                              style: TextStyle(
+                                color: isSelected 
+                                   ? (isEscasez ? Colors.black : Colors.white) 
+                                   : Colors.white54,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );
                   },
                 ),
               ),
+              const SizedBox(height: 12),
+              // Products Grid
               Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80), // bottom padding for FAB
+                child: GridView.builder(
+                  padding: const EdgeInsets.only(left: 16, right: 16, top: 4, bottom: 80), 
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                     maxCrossAxisExtent: 400,
+                     mainAxisExtent: 130,
+                     crossAxisSpacing: 12,
+                     mainAxisSpacing: 12,
+                  ),
                   itemCount: filteredProducts.length,
                   itemBuilder: (context, index) {
                     final p = filteredProducts[index];
-                    return Card(
-                      color: const Color(0xFF161b22),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(
+                    final int stock = (p['stock'] as num?)?.toInt() ?? 0;
+                    final bool isLowStock = stock <= 5;
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF161b22),
                         borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: Colors.white12)
+                        border: Border.all(color: isLowStock ? Colors.amber.withOpacity(0.5) : Colors.white12),
                       ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.indigo.withOpacity(0.2),
-                          foregroundColor: Colors.indigoAccent,
-                          child: const Icon(Icons.inventory_2),
-                        ),
-                        title: Text(p['name'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                        subtitle: Text('Categoría: ${p['category'] ?? "General"} | Precio: \$${p['price']}', style: const TextStyle(color: Colors.white54)),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.white70),
-                              tooltip: 'Editar',
-                              onPressed: () => _showProductForm(p),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.redAccent),
-                              tooltip: 'Eliminar',
-                              onPressed: () => _deleteProduct(context, ref, p['id'], p['name']),
-                            ),
-                          ],
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                           Row(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                               Expanded(
+                                 child: Column(
+                                   crossAxisAlignment: CrossAxisAlignment.start,
+                                   children: [
+                                     Text(p['name'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                     const SizedBox(height: 2),
+                                     Text(p['category'] ?? "General", style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                   ],
+                                 ),
+                               ),
+                               Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                     IconButton(
+                                       icon: const Icon(Icons.edit, color: Colors.indigoAccent, size: 20),
+                                       padding: EdgeInsets.zero,
+                                       constraints: const BoxConstraints(),
+                                       onPressed: () => _showProductForm(p),
+                                     ),
+                                     const SizedBox(width: 8),
+                                     IconButton(
+                                       icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
+                                       padding: EdgeInsets.zero,
+                                       constraints: const BoxConstraints(),
+                                       onPressed: () => _deleteProduct(context, ref, p['id'], p['name']),
+                                     ),
+                                  ],
+                               )
+                             ]
+                           ),
+                           const Spacer(),
+                           Row(
+                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                             crossAxisAlignment: CrossAxisAlignment.end,
+                             children: [
+                               Column(
+                                 crossAxisAlignment: CrossAxisAlignment.start,
+                                 children: [
+                                    const Text('Precio', style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    Text('\$${p['price']}', style: const TextStyle(color: Colors.greenAccent, fontSize: 18, fontWeight: FontWeight.w900)),
+                                 ],
+                               ),
+                               Column(
+                                 crossAxisAlignment: CrossAxisAlignment.end,
+                                 children: [
+                                    const Text('Stock Físico', style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    Container(
+                                       margin: const EdgeInsets.only(top: 2),
+                                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                       decoration: BoxDecoration(
+                                         color: const Color(0xFF0b0f14),
+                                         borderRadius: BorderRadius.circular(8),
+                                         border: Border.all(color: isLowStock ? Colors.amber.withOpacity(0.3) : Colors.white12),
+                                       ),
+                                       child: Row(
+                                         children: [
+                                            InkWell(
+                                               onTap: () => _updateStock(context, ref, p['id'], stock, -1),
+                                               child: const Padding(padding: EdgeInsets.all(4), child: Icon(Icons.remove, color: Colors.white54, size: 16)),
+                                            ),
+                                            Container(
+                                               width: 32,
+                                               alignment: Alignment.center,
+                                               child: Text('$stock', style: TextStyle(color: isLowStock ? Colors.amber : Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                                            ),
+                                            InkWell(
+                                               onTap: () => _updateStock(context, ref, p['id'], stock, 1),
+                                               child: const Padding(padding: EdgeInsets.all(4), child: Icon(Icons.add, color: Colors.white54, size: 16)),
+                                            ),
+                                         ]
+                                       )
+                                    )
+                                 ],
+                               )
+                             ],
+                           )
+                        ]
                       ),
                     );
                   },
