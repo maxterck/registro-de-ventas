@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'controllers/auth_controller.dart';
 import 'admin_login_dialog.dart';
+import 'susy_logo.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -49,11 +50,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.point_of_sale_rounded,
-                size: 80,
-                color: Colors.indigo,
-              ),
+              const SusyMarketLogo(size: 100),
               const SizedBox(height: 16),
               GestureDetector(
                 onTap: () {
@@ -64,7 +61,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   }
                 },
                 child: const Text(
-                  'Sistema de Ventas',
+                  'Susy Market',
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w900,

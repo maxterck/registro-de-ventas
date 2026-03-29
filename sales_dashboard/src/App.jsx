@@ -67,7 +67,7 @@ export default function App() {
           <h2 className="text-2xl font-bold text-white mb-2 text-center">Configura tu Negocio</h2>
           <p className="text-slate-400 mb-8 text-sm text-center">Para poder asignar llaves y vender, primero ponle un nombre a tu tienda.</p>
           <input type="text" placeholder="Nombre (Ej. Kiosko Los Pinos)" value={storeName} onChange={e => setStoreName(e.target.value)} required className="w-full bg-[#0b0f14] border border-slate-700 text-white px-5 py-3.5 rounded-xl mb-6 focus:ring-2 focus:ring-indigo-500/50 focus:outline-none placeholder:text-slate-600" />
-          <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3.5 rounded-xl font-semibold transition-all shadow-lg flex justify-center">{loading ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Comenzar a usar SalesSync'}</button>
+          <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3.5 rounded-xl font-semibold transition-all shadow-lg flex justify-center">{loading ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Comenzar a usar Susy Market'}</button>
         </form>
       </div>
     );

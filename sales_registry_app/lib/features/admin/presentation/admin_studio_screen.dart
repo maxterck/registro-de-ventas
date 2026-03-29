@@ -46,7 +46,7 @@ class _AdminStudioScreenState extends ConsumerState<AdminStudioScreen> with Sing
           children: [
             Icon(Icons.store, color: Colors.indigoAccent),
             SizedBox(width: 8),
-            Text('SalesSync: Modo Jefe', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white)),
+            Text('Susy Market: Modo Jefe', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white)),
           ],
         ),
         backgroundColor: const Color(0xFF161b22), // Dark slate/indigo matching PC

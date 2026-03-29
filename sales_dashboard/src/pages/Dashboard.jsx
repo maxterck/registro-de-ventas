@@ -4,6 +4,7 @@ import KeysManager from '../components/KeysManager';
 import ProductsManager from '../components/ProductsManager';
 import SalesManager from '../components/SalesManager';
 import ClientsManager from '../components/ClientsManager';
+import HouseLogo3D from '../components/HouseLogo3D';
 import { supabase } from '../lib/supabaseClient';
 
 export default function Dashboard({ store }) {
@@ -33,10 +34,10 @@ export default function Dashboard({ store }) {
         {/* Sidebar */}
         <aside className="w-72 bg-[#161b22] border-r border-slate-800 flex flex-col z-20 shadow-2xl">
           <div className="p-6 pb-2 text-2xl font-extrabold flex items-center gap-3 tracking-tight text-white mb-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Store className="text-white w-5 h-5" />
+            <div className="w-12 h-12 flex items-center justify-center">
+              <HouseLogo3D width={50} height={50} />
             </div>
-            SalesSync
+            Susy Market
           </div>
           <div className="px-6 pb-6 border-b border-slate-800/50 mb-4">
              <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider block">TIENDA ACTIVA</span>
