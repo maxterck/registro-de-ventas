@@ -496,6 +496,27 @@ class _CheckoutDialogState extends ConsumerState<CheckoutDialog> {
   String _paymentMethod = 'cash'; // 'cash', 'transfer', 'credit'
   bool _isProcessing = false;
   final TextEditingController _customerController = TextEditingController();
+  final TextEditingController _cashReceivedController = TextEditingController();
+  double _changeAmount = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _cashReceivedController.addListener(_calculateChange);
+  }
+
+  @override
+  void dispose() {
+    _cashReceivedController.dispose();
+    super.dispose();
+  }
+
+  void _calculateChange() {
+    final received = double.tryParse(_cashReceivedController.text.trim()) ?? 0.0;
+    setState(() {
+      _changeAmount = received - widget.total;
+    });
+  }
 
   Future<void> _submitSale() async {
     final customer = _customerController.text.trim();
@@ -591,7 +612,43 @@ class _CheckoutDialogState extends ConsumerState<CheckoutDialog> {
                     _PayMethodBtn(icon: Icons.money_off, label: 'Fiado', isSelected: _paymentMethod == 'credit', onTap: () => setState(() => _paymentMethod = 'credit')),
                  ],
                ),
-               const SizedBox(height: 32),
+               const SizedBox(height: 24),
+
+               // Calculadora de Vuelto Automática (Solo si es en Efectivo)
+               if (_paymentMethod == 'cash') ...[
+                  const Text('Calculadora de Vuelto', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  Container(
+                     padding: const EdgeInsets.all(16),
+                     decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade300)),
+                     child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                           TextField(
+                              controller: _cashReceivedController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: InputDecoration(
+                                 hintText: 'Paga con: Ej. ${widget.total.ceil()}',
+                                 prefixIcon: const Icon(Icons.attach_money, color: Colors.green),
+                                 filled: true,
+                                 fillColor: Colors.white,
+                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)
+                              ),
+                           ),
+                           if (_cashReceivedController.text.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              if (_changeAmount >= 0)
+                                 Text('DAR VUELTO: \$${_changeAmount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w900, fontSize: 22), textAlign: TextAlign.center)
+                              else
+                                 Text('FALTAN: \$${_changeAmount.abs().toStringAsFixed(2)}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18), textAlign: TextAlign.center),
+                           ]
+                        ]
+                     )
+                  ),
+                  const SizedBox(height: 32),
+               ] else ...[
+                  const SizedBox(height: 32),
+               ],
 
                // Botones Finales
                Row(

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { ShoppingCart, DollarSign, Filter, Loader2, ArrowUpRight, Trash2, Edit, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function SalesManager({ storeId }) {
   const [sales, setSales] = useState([]);
@@ -13,6 +14,8 @@ export default function SalesManager({ storeId }) {
     if (storeId) loadSales();
   }, [storeId]);
 
+  const [clientsData, setClientsData] = useState([]);
+
   const loadSales = async () => {
     setLoading(true);
     const { data } = await supabase
@@ -21,7 +24,13 @@ export default function SalesManager({ storeId }) {
        .eq('store_id', storeId)
        .order('timestamp', { ascending: false });
        
+    const { data: clientsRes } = await supabase
+       .from('clients')
+       .select('*')
+       .eq('store_id', storeId);
+
     if (data) setSales(data);
+    if (clientsRes) setClientsData(clientsRes);
     setLoading(false);
   };
 
@@ -29,7 +38,7 @@ export default function SalesManager({ storeId }) {
      if (s.is_voided) return;
      const reason = prompt('Escribí el motivo por el que anulás esta venta:');
      if (reason === null) return;
-     if (reason.trim() === '') { alert('El motivo es obligatorio para anular.'); return; }
+     if (reason.trim() === '') { toast.error('El motivo es obligatorio para anular.'); return; }
 
      if(confirm('¿Confirmar anulación? El dinero no contará en los balances ni deudas.')) {
         const { data, error } = await supabase.from('sales')
@@ -40,13 +49,13 @@ export default function SalesManager({ storeId }) {
         if(data) {
            setSales(sales.map(sale => sale.id === s.id ? data : sale));
         } else {
-           alert('Error al anular. (Asegúrate de haber ejecutado el SQL en Supabase para crear las columnas is_voided y cancel_reason)');
+           toast.error('Error al anular. (Asegúrate de haber ejecutado el SQL en Supabase para crear las columnas is_voided y cancel_reason)');
         }
      }
   };
 
   const toggleDebtStatus = async (sale) => {
-     if (sale.is_voided) { alert('No puedes modificar una venta anulada.'); return; }
+     if (sale.is_voided) { toast.error('No puedes modificar una venta anulada.'); return; }
      
      const isCurrentlyDebt = sale.is_debt;
      const newPaymentMethod = isCurrentlyDebt ? 'cash' : 'credit';
@@ -117,7 +126,7 @@ export default function SalesManager({ storeId }) {
          return d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear();
      });
 
-     if(thisMonthSales.length === 0) return alert('No hay ventas confirmadas de este mes para exportar');
+     if(thisMonthSales.length === 0) return toast.error('No hay ventas confirmadas de este mes para exportar');
      
      // Usamos punto y coma (;) para compatibilidad con Excel en regiones con habla hispana
      const headers = ['Día', 'Precio', 'Producto', 'Vendido Por', 'Compró', 'Total'];
@@ -270,7 +279,21 @@ export default function SalesManager({ storeId }) {
                             <span className={`font-medium text-lg block ${s.is_voided ? 'line-through text-slate-500' : 'text-white'}`}>{s.product_name_snapshot}</span>
                             {s.is_voided && <span className="bg-rose-500/20 text-rose-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-rose-500/30">ANULADA</span>}
                          </div>
-                         {s.is_debt && !s.is_voided && <span className="inline-flex mt-1 items-center text-xs font-bold bg-orange-500/10 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-md shadow-sm">Cliente: {s.customer_name}</span>}
+                         {s.is_debt && !s.is_voided && (
+                            <div className="flex flex-col items-start gap-1 mt-1">
+                               <span className="inline-flex items-center text-[11px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-md shadow-sm">
+                                  Token / Registro: {s.customer_name}
+                               </span>
+                               {(() => {
+                                  const match = clientsData.find(c => c.token === s.customer_name || c.alias_names.includes(s.customer_name));
+                                  return (
+                                     <span className="text-xs font-bold text-orange-400 pl-1">
+                                        Identidad: {match ? match.alias_names[0] : 'Cliente Desconocido'}
+                                     </span>
+                                  );
+                               })()}
+                            </div>
+                         )}
                          {s.is_voided && <p className="text-xs text-slate-400 mt-1">Motivo: {s.cancel_reason}</p>}
                      </td>
                      

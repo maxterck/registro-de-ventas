@@ -141,7 +141,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             _keyController.text.trim(),
                           );
                           if (success && context.mounted) {
-                            context.go('/'); // Navigate to dashboard/POS view
+                            context.go('/'); // Navigate direct to dashboard/POS (Caja gate bypassed)
                           }
                         },
                   style: ElevatedButton.styleFrom(

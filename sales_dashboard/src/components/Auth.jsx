@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Store, ArrowRight, Loader2 } from 'lucide-react';
 import HouseLogo3D from './HouseLogo3D';
+import { toast } from 'sonner';
 
 export default function Auth({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -21,7 +22,7 @@ export default function Auth({ onLogin }) {
       } else {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        alert('Registro exitoso. Revisa tu email o inicia sesión si el auto-login funcionó.');
+        toast.success('Registro exitoso. Revisa tu email o inicia sesión si el auto-login funcionó.');
       }
       onLogin();
     } catch (err) {

@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/auth/presentation/login_screen.dart';
+import 'features/auth/presentation/shift_gate_screen.dart';
 import 'features/sales/presentation/pos_screen.dart';
 import 'features/admin/presentation/admin_studio_screen.dart';
 
@@ -38,6 +39,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin_studio',
         builder: (context, state) => const AdminStudioScreen(),
+      ),
+      GoRoute(
+        path: '/shift_gate',
+        builder: (context, state) => const ShiftGateScreen(),
       ),
     ],
   );

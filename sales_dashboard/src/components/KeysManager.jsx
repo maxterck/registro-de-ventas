@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Key, UserPlus, ShieldAlert, MonitorCheck, Loader2, Trash2, Receipt, TrendingUp, Power, PowerOff, X, FileText, Scale } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function KeysManager({ storeId }) {
   const [keys, setKeys] = useState([]);
@@ -43,7 +44,7 @@ export default function KeysManager({ storeId }) {
       is_active: true
     }]).select('*, sales(amount)').single();
     
-    if (error) alert(error.message);
+    if (error) toast.error(error.message);
     if (data) {
       setKeys([data, ...keys]);
       setNewEmployeeName('');
@@ -70,10 +71,10 @@ export default function KeysManager({ storeId }) {
     const { data, error } = await supabase.from('access_keys').update({ can_manage_products: newVal }).eq('id', keyData.id).select('*, sales(amount)').single();
     if (data) {
       setKeys(keys.map(k => k.id === keyData.id ? data : k));
-      if (newVal) alert('🌟 Función VIP Activada: Este empleado ahora puede añadir/modificar productos.');
-      else alert('Permisos VIP desactivados.');
+      if (newVal) toast.success('🌟 Función VIP Activada: Este empleado ahora puede añadir/modificar productos.');
+      else toast.info('Permisos VIP desactivados.');
     } else {
-      alert('Error: Asegúrate de haber ejecutado el SQL para añadir la columna can_manage_products');
+      toast.error('Error: Asegúrate de haber ejecutado el SQL para añadir la columna can_manage_products');
     }
   };
 
@@ -82,9 +83,21 @@ export default function KeysManager({ storeId }) {
     const { data, error } = await supabase.from('access_keys').update({ can_settle_debts: newVal }).eq('id', keyData.id).select('*, sales(amount)').single();
     if (data) {
       setKeys(keys.map(k => k.id === keyData.id ? data : k));
-      if (newVal) alert('⚖️ Permiso Otorgado: Este cajero ahora puede saldar deudas de Fiados.');
+      if (newVal) toast.success('⚖️ Permiso Otorgado: Este cajero ahora puede saldar deudas de Fiados.');
     } else {
-      alert('Error: Asegúrate de haber ejecutado el SQL para añadir la columna can_settle_debts (ALTER TABLE access_keys ADD COLUMN can_settle_debts BOOLEAN DEFAULT false;)');
+      toast.error('Error: Asegúrate de haber ejecutado el SQL para añadir la columna can_settle_debts (ALTER TABLE access_keys ADD COLUMN can_settle_debts BOOLEAN DEFAULT false;)');
+    }
+  };
+
+  const toggleShiftControl = async (keyData) => {
+    const newVal = !keyData.requires_shift_control;
+    const { data, error } = await supabase.from('access_keys').update({ requires_shift_control: newVal }).eq('id', keyData.id).select('*, sales(amount)').single();
+    if (data) {
+      setKeys(keys.map(k => k.id === keyData.id ? data : k));
+      if (newVal) toast.success('🔒 Control de Caja Activado. Se le exigirá a este cajero declarar dinero inicial.');
+      else toast.info('Control de Caja Desactivado.');
+    } else {
+      toast.error('Error al actualizar el control de caja.');
     }
   };
 

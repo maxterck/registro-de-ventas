@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Users, UserPlus, Trash2, Receipt, TrendingUp, DollarSign, WalletCards, ShieldAlert, Loader2, CreditCard, ChevronDown, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function ClientsManager({ storeId, onDashboardUpdate }) {
+  const [searchTerm, setSearchTerm] = useState('');
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -56,7 +58,7 @@ export default function ClientsManager({ storeId, onDashboardUpdate }) {
 
   const createClientToken = async (e) => {
     e.preventDefault();
-    if (tempAliases.length === 0) return alert('Debes agregar al menos 1 nombre/alias para vincular este token.');
+    if (tempAliases.length === 0) return toast.error('Debes agregar al menos 1 nombre/alias para vincular este token.');
     setIsCreating(true);
 
     const fullToken = newTokenPrefix + Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -68,7 +70,7 @@ export default function ClientsManager({ storeId, onDashboardUpdate }) {
     }]).select().single();
 
     if (error) {
-       alert('Error: ' + error.message);
+       toast.error('Error: ' + error.message);
     } else if (data) {
        setTempAliases([]);
        setNewTokenPrefix('CLI-');
@@ -204,13 +206,27 @@ export default function ClientsManager({ storeId, onDashboardUpdate }) {
         </div>
       </div>
 
+      {/* Barra de Búsqueda */}
+      <div className="mb-6 relative">
+          <input 
+             type="text"
+             placeholder="Buscar cliente por Token o Nombres..."
+             value={searchTerm}
+             onChange={(e) => setSearchTerm(e.target.value)}
+             className="w-full bg-[#0b0f14] border border-slate-700 text-white pl-4 pr-10 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+          />
+      </div>
+
       {loading && clients.length === 0 && (
          <div className="flex justify-center p-12"><Loader2 className="w-10 h-10 text-indigo-500 animate-spin"/></div>
       )}
 
       {/* Grid de Cartas de Clientes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {clients.map((client) => {
+        {clients.filter(c => {
+           const s = searchTerm.toLowerCase();
+           return c.token.toLowerCase().includes(s) || c.alias_names.some(a => a.toLowerCase().includes(s));
+        }).map((client) => {
            // Lógica de colores Dinámicos
            let borderColor = 'border-slate-800 hover:border-indigo-500/40';
            let bgHeader = 'bg-slate-800/20 text-slate-300';
@@ -290,7 +306,7 @@ export default function ClientsManager({ storeId, onDashboardUpdate }) {
 
       {/* Modal / Overlay Gestión de Consumos */}
       {selectedClient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
            <div className="bg-[#161b22] border border-slate-700 w-full max-w-4xl max-h-[85vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col slide-in-from-bottom-8">
               
               {/* Header Modal */}

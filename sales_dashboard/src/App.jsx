@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import ClientPortal from './pages/ClientPortal';
 import Auth from './components/Auth';
 import { Loader2, Store } from 'lucide-react';
+import { Toaster, toast } from 'sonner';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -47,7 +48,7 @@ export default function App() {
     setLoading(true);
     const { data, error } = await supabase.from('stores').insert([{ owner_id: session.user.id, name: storeName }]).select().single();
     if (!error && data) setStore(data);
-    else alert(error?.message || 'Error al crear la tienda');
+    else toast.error(error?.message || 'Error al crear la tienda');
     setLoading(false);
   };
 

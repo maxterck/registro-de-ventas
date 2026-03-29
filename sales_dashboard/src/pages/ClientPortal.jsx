@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Loader2, AlertCircle, TrendingUp, Key, LogOut } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function ClientPortal() {
   const [token, setToken] = useState('');
@@ -45,7 +46,7 @@ export default function ClientPortal() {
      await supabase.from('clients').update({ payment_alert: true }).eq('id', client.id);
      setClient({ ...client, payment_alert: true });
      setAlerting(false);
-     alert('¡Aviso enviado exitosamente! Acercate a la caja para realizar tu pago.');
+     toast.success('¡Aviso enviado exitosamente! Acercate a la caja para realizar tu pago.');
   };
 
   if (!client) {

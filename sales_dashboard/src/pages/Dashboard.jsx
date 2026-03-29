@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Store, KeyRound, ShoppingCart, Package, Users, LogOut, TrendingUp, AlertCircle, ArrowUpRight } from 'lucide-react';
+import { Store, KeyRound, ShoppingCart, Package, Users, LogOut, TrendingUp, AlertCircle, ArrowUpRight, BarChart3, Clock } from 'lucide-react';
+import { toast } from 'sonner';
 import KeysManager from '../components/KeysManager';
 import ProductsManager from '../components/ProductsManager';
 import SalesManager from '../components/SalesManager';
 import ClientsManager from '../components/ClientsManager';
+import AnalyticsManager from '../components/AnalyticsManager';
+import ShiftsManager from '../components/ShiftsManager';
 import HouseLogo3D from '../components/HouseLogo3D';
 import { supabase } from '../lib/supabaseClient';
 
@@ -15,7 +18,7 @@ export default function Dashboard({ store }) {
      const { data, error } = await supabase.from('sales').select('amount, is_debt, is_voided').eq('store_id', store.id);
      if (error) {
         console.error('Error fetching global sales:', error);
-        alert('Error: Faltan columnas en Supabase (is_debt, is_voided, customer_name, etc). Ejecuta el SQL necesario.');
+        toast.error('Error: Faltan columnas en Supabase (is_debt, is_voided, customer_name, etc). Ejecuta el SQL necesario.');
      }
      if(data) setGlobalSales(data);
   };
@@ -45,6 +48,7 @@ export default function Dashboard({ store }) {
           </div>
 
           <nav className="flex-1 px-4 space-y-2">
+            <NavItem active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={<BarChart3 size={20} />} label="Analíticas" />
             <NavItem active={activeTab === 'keys'} onClick={() => setActiveTab('keys')} icon={<KeyRound size={20} />} label="Llaves de Acceso" />
             <NavItem active={activeTab === 'sales'} onClick={() => setActiveTab('sales')} icon={<ShoppingCart size={20} />} label="Registro de Ventas" />
             <NavItem active={activeTab === 'products'} onClick={() => setActiveTab('products')} icon={<Package size={20} />} label="Catálogo" />
@@ -96,6 +100,7 @@ export default function Dashboard({ store }) {
 
             {/* Render de Pestañas */}
             <div className="pb-10">
+              {activeTab === 'analytics' && <AnalyticsManager storeId={store.id} />}
               {activeTab === 'keys' && <KeysManager storeId={store.id} onDashboardUpdate={fetchGlobalSales} />}
               {activeTab === 'sales' && <SalesManager storeId={store.id} />}
               {activeTab === 'products' && <ProductsManager storeId={store.id} />}
